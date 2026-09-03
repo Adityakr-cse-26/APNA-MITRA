@@ -1,11 +1,32 @@
 <div align="center">
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <h1>🩺 APNA MITRA</h1>
 
-  <h1>Built with AI Studio</h2>
+  <h3>Your AI-Powered Healthcare Companion</h3>
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+  <p>
+    <em>Technology that cares. Intelligence that helps.</em>
+  </p>
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+  <p>
+    Apna Mitra is an AI-powered healthcare platform built to provide
+    accessible, personalized, and user-friendly health assistance.
+  </p>
+
+  <br>
+
+  <a href="https://apna-mitra-ai-healtth.ai.studio/">
+    <img src="https://img.shields.io/badge/🌐%20Visit%20Apna%20Mitra-0A7CFF?style=for-the-badge" alt="Visit Apna Mitra">
+  </a>
+
+  <a href="https://apna-mitra-ai-healtth.ai.studio/">
+    <img src="https://img.shields.io/badge/🚀%20Live%20App-00A86B?style=for-the-badge" alt="Live App">
+  </a>
+
+  <br><br>
+
+  <p>
+    ❤️ Built with the vision of making healthcare smarter and more accessible.
+  </p>
 
 </div>
