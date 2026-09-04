@@ -249,7 +249,7 @@ INTERFACE     ████████████████████ 100%
 
 <br><br>
 
-### `BUILDING TECHNOLOGY WITH A HUMAN PURPOSE.`
+### `BUILDING TECHNOLOGY FOR A HUMAN PURPOSE.`
 
 <br>
 
