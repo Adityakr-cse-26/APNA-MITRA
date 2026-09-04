@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information including caretakers.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "age": { "type": "number", "minimum": 0, "maximum": 150 },
+        "gender": { "type": "string", "enum": ["male", "female", "other"] },
+        "phone": { "type": "string", "maxLength": 20 },
+        "address": { "type": "string", "maxLength": 500 },
+        "bloodGroup": { "type": "string", "maxLength": 10 },
+        "chronicConditions": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 100 },
+          "maxItems": 20
+        },
+        "allergies": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 100 },
+          "maxItems": 20
+        },
+        "isRegistered": { "type": "boolean" },
+        "caretakers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "maxLength": 100 },
+              "name": { "type": "string", "maxLength": 100 },
+              "relation": { "type": "string", "maxLength": 100 },
+              "phone": { "type": "string", "maxLength": 20 },
+              "email": { "type": "string", "maxLength": 100 },
+              "isPrimary": { "type": "boolean" }
+            }
+          },
+          "maxItems": 10
+        },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["ownerId", "name", "createdAt", "updatedAt"]
+    },
+    "VitalReading": {
+      "title": "VitalReading",
+      "description": "Health vital reading.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["bp", "hr", "spo2", "sugar", "weight"] },
+        "value": { "type": "string", "maxLength": 50 },
+        "unit": { "type": "string", "maxLength": 20 },
+        "timestamp": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "enum": ["normal", "warning", "alert"] },
+        "note": { "type": "string", "maxLength": 500 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["ownerId", "type", "value", "unit", "timestamp", "status", "createdAt", "updatedAt"]
+    },
+    "Medication": {
+      "title": "Medication",
+      "description": "User medication details.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "dosage": { "type": "string", "maxLength": 50 },
+        "timing": { "type": "string", "enum": ["Morning", "Afternoon", "Evening", "Night", "Before Food", "After Food"] },
+        "takenToday": { "type": "boolean" },
+        "instructions": { "type": "string", "maxLength": 200 },
+        "scheduledTime": { "type": "string", "maxLength": 50 },
+        "remainingPills": { "type": "number" },
+        "totalPills": { "type": "number" },
+        "critical": { "type": "boolean" },
+        "snoozedUntil": { "type": "number" },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["ownerId", "name", "dosage", "timing", "takenToday", "createdAt", "updatedAt"]
+    },
+    "DailyCheckin": {
+      "title": "DailyCheckin",
+      "description": "User daily health and mood checkin.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "maxLength": 50 },
+        "mood": { "type": "string", "enum": ["great", "good", "okay", "low", "sad"] },
+        "symptoms": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 100 },
+          "maxItems": 20
+        },
+        "notes": { "type": "string", "maxLength": 500 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["ownerId", "date", "mood", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores user profiles."
+    },
+    "/users/{userId}/vitals/{vitalId}": {
+      "schema": { "$ref": "#/entities/VitalReading" },
+      "description": "Stores user vitals."
+    },
+    "/users/{userId}/medications/{medicationId}": {
+      "schema": { "$ref": "#/entities/Medication" },
+      "description": "Stores user medications."
+    },
+    "/users/{userId}/checkins/{checkinId}": {
+      "schema": { "$ref": "#/entities/DailyCheckin" },
+      "description": "Stores user daily checkins."
+    }
+  }
+}

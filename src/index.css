@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: 'Fraunces', Georgia, serif;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #EEF3EA;
+}
+::-webkit-scrollbar-thumb {
+  background: #B4C6BB;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2D6A5D;
+}
+
+
+/* AI Studio Focus Mode Styles */
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > span:nth-of-type(2) {
+  color: black !important;
+  font-weight: bold !important;
+}
+
+/* Hide Google Translate UI and Overrides */
+.goog-te-banner-frame.skiptranslate {
+    display: none !important;
+} 
+body {
+    top: 0px !important; 
+}
+#goog-gt-tt {
+    display: none !important;
+}
+.goog-text-highlight {
+    background-color: transparent !important;
+    box-shadow: none !important;
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Apna Mitra - AI Health Companion",
+  "description": "Your AI health companion for understanding health information, analyzing medical records, tracking vitals, managing medication reminders, and preparing for doctor visits.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
