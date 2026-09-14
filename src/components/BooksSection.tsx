@@ -3,6 +3,26 @@ import { BookOpen, Search, ExternalLink, X, Book } from "lucide-react";
 import { Language } from "../types";
 import { supabase } from "../supabase";
 
+const COVER_STYLES = [
+  { bg: 'from-[#1F4E46] to-[#0a1e1b]', border: 'border-l-[#122e29]', text: 'text-amber-50', underline: 'border-amber-500/40' },
+  { bg: 'from-rose-900 to-rose-950', border: 'border-l-rose-950', text: 'text-rose-50', underline: 'border-rose-500/40' },
+  { bg: 'from-slate-800 to-slate-950', border: 'border-l-slate-900', text: 'text-slate-50', underline: 'border-slate-500/40' },
+  { bg: 'from-purple-900 to-purple-950', border: 'border-l-purple-950', text: 'text-purple-50', underline: 'border-purple-500/40' },
+  { bg: 'from-amber-800 to-amber-950', border: 'border-l-amber-900', text: 'text-amber-50', underline: 'border-amber-500/40' },
+  { bg: 'from-teal-800 to-teal-950', border: 'border-l-teal-900', text: 'text-teal-50', underline: 'border-teal-500/40' },
+  { bg: 'from-indigo-900 to-indigo-950', border: 'border-l-indigo-950', text: 'text-indigo-50', underline: 'border-indigo-500/40' },
+  { bg: 'from-stone-700 to-stone-900', border: 'border-l-stone-800', text: 'text-stone-50', underline: 'border-stone-500/40' },
+];
+
+const getBookStyle = (title) => {
+  if (!title) return COVER_STYLES[0];
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = title.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return COVER_STYLES[Math.abs(hash) % COVER_STYLES.length];
+};
+
 interface BooksSectionProps {
   currentLang: Language;
 }
@@ -290,7 +310,7 @@ export const BooksSection: React.FC<BooksSectionProps> = ({ currentLang }) => {
   );
 
   return (
-    <section id="books" className="py-16 md:py-24 bg-white border-y border-[#D8E2DA]">
+    <section id="books" className="py-16 md:py-24 bg-white border-y border-[#E2E4E0]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Heading */}
@@ -381,7 +401,7 @@ export const BooksSection: React.FC<BooksSectionProps> = ({ currentLang }) => {
         )}
         {/* Books Grid */}
         {fetchError ? (
-          <div className="text-center py-20 bg-red-50 rounded-3xl border border-red-200">
+          <div className="text-center py-20 bg-red-50 rounded-2xl border border-red-200">
             <h3 className="text-xl font-bold text-red-700 mb-2">Error Loading Books</h3>
             <p className="text-red-500">{fetchError}</p>
           </div>
@@ -391,7 +411,7 @@ export const BooksSection: React.FC<BooksSectionProps> = ({ currentLang }) => {
             <p>Loading books...</p>
           </div>
         ) : filteredBooks.length === 0 ? (
-          <div className="text-center py-20 bg-gray-50 rounded-3xl border border-gray-200">
+          <div className="text-center py-20 bg-gray-50 rounded-2xl border border-gray-200">
             <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-700 mb-2">No books found</h3>
             <p className="text-gray-500">Try adjusting your search or select a different language.</p>
@@ -401,16 +421,21 @@ export const BooksSection: React.FC<BooksSectionProps> = ({ currentLang }) => {
             {filteredBooks.map((book) => (
               <article 
                 key={book.id} 
-                className="bg-[#F4F7F4] rounded-3xl p-6 sm:p-7 border border-[#D8E2DA] shadow-sm hover:shadow-lg transition-all duration-300 group flex flex-col h-full cursor-pointer"
+                className="bg-[#FAFAFA] rounded-2xl p-6 sm:p-7 border border-[#E2E4E0] shadow-sm hover:shadow-lg transition-all duration-300 group flex flex-col h-full cursor-pointer"
                 onClick={() => setSelectedBook(book)}
               >
                 <div className="flex items-start gap-4 mb-4">
                   <div className="w-16 h-20 bg-gray-200 rounded-lg overflow-hidden shrink-0 shadow-sm border border-gray-300">
-                    {book.cover_url ? (
+                                        {book.cover_url ? (
                       <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-[#DCEAE4] text-[#1F4E46]">
-                        <Book className="w-8 h-8" />
+                                            <div className={`w-full h-full bg-gradient-to-br ${getBookStyle(book.title).bg} ${getBookStyle(book.title).text} flex flex-col items-center justify-center p-1.5 text-center relative overflow-hidden shadow-inner border-l-4 ${getBookStyle(book.title).border}`}>
+                        <div className="absolute top-0 left-0 w-full h-full bg-white/5"></div>
+                        <div className="absolute left-1 top-0 bottom-0 w-px bg-black/40"></div>
+                        <div className="absolute left-1.5 top-0 bottom-0 w-px bg-white/10"></div>
+                        <span className={`text-[10px] font-serif font-bold leading-[1.2] line-clamp-4 z-10 drop-shadow-md border-b pb-0.5 px-0.5 ${getBookStyle(book.title).underline}`}>
+                          {book.title}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -431,26 +456,11 @@ export const BooksSection: React.FC<BooksSectionProps> = ({ currentLang }) => {
                     {readError}
                   </div>
                 )}
-                <div className="mt-auto pt-4 border-t border-[#D8E2DA]">
-                  {book.pdf_url ? (
-                    <button 
-                      disabled={openingBookId === book.id}
-                      onClick={(e) => handleReadBook(e, book)}
-                      className={`flex items-center justify-center gap-2 w-full ${openingBookId === book.id ? 'bg-[#153A34] opacity-80 cursor-wait' : 'bg-[#1F4E46] hover:bg-[#153A34]'} text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-sm`}
-                    >
-                      <BookOpen className={`w-4 h-4 ${openingBookId === book.id ? 'animate-pulse' : ''}`} />
-                      {openingBookId === book.id ? 'Opening book...' : 'Read Book'}
-                    </button>
-                  ) : (
-                    <button 
-                      disabled
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center justify-center gap-2 w-full bg-gray-200 text-gray-500 font-bold py-2.5 px-2 rounded-xl cursor-not-allowed text-xs text-center"
-                    >
-                      Book content will be available soon.
-                    </button>
-                  )}
-
+                
+                <div className="mt-auto flex items-center justify-between border-t border-[#E2E4E0] pt-4">
+                  <span className="text-xs font-bold text-[#1F4E46] flex items-center gap-1">
+                    Read Book <ExternalLink className="w-3 h-3" />
+                  </span>
                 </div>
               </article>
             ))}
@@ -460,71 +470,73 @@ export const BooksSection: React.FC<BooksSectionProps> = ({ currentLang }) => {
 
       {/* Book Details Modal */}
       {selectedBook && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative">
-            <button
-              onClick={() => setSelectedBook(null)}
-              className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors z-10"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto" onClick={() => setSelectedBook(null)}>
+          <div className="bg-[#F8FAF8] border border-[#E2E4E0] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden my-6 animate-in fade-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#1F4E46] via-[#2A655A] to-[#1F4E46] text-white p-6 relative">
+              <button
+                type="button"
+                onClick={() => setSelectedBook(null)}
+                className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="font-serif text-2xl font-bold pr-10">{selectedBook.title}</h3>
+              <p className="text-emerald-100 font-medium mt-1">{selectedBook.author || 'Unknown Author'}</p>
+            </div>
             
-            <div className="flex flex-col md:flex-row h-full overflow-y-auto">
-              <div className="w-full md:w-2/5 bg-gray-50 p-8 flex items-center justify-center border-b md:border-b-0 md:border-r border-gray-200">
-                 {selectedBook.cover_url ? (
-                    <img src={selectedBook.cover_url} alt={selectedBook.title} className="w-full max-w-[250px] rounded-lg shadow-xl" />
+            <div className="p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row gap-6">
+                <div className="w-32 h-40 bg-gray-200 rounded-lg overflow-hidden shrink-0 shadow-md border border-gray-300 mx-auto sm:mx-0">
+                  {selectedBook.cover_url ? (
+                    <img src={selectedBook.cover_url} alt={selectedBook.title} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full max-w-[250px] aspect-[2/3] rounded-lg shadow-xl flex items-center justify-center bg-[#DCEAE4] text-[#1F4E46]">
-                      <Book className="w-20 h-20" />
+                                        <div className={`w-full h-full bg-gradient-to-br ${getBookStyle(selectedBook.title).bg} ${getBookStyle(selectedBook.title).text} flex flex-col items-center justify-center p-2 text-center relative overflow-hidden shadow-inner border-l-4 ${getBookStyle(selectedBook.title).border}`}>
+                        <div className="absolute top-0 left-0 w-full h-full bg-white/5"></div>
+                        <div className="absolute left-1 top-0 bottom-0 w-px bg-black/40"></div>
+                        <div className="absolute left-1.5 top-0 bottom-0 w-px bg-white/10"></div>
+                        <span className={`text-xs font-serif font-bold leading-[1.2] line-clamp-4 z-10 drop-shadow-md border-b pb-0.5 px-0.5 ${getBookStyle(selectedBook.title).underline}`}>
+                          {selectedBook.title}
+                        </span>
                     </div>
                   )}
-              </div>
-              <div className="w-full md:w-3/5 p-8 flex flex-col">
-                <span className="text-xs font-bold uppercase tracking-widest text-[#1F4E46] bg-[#DCEAE4] px-3 py-1 rounded-full w-max mb-4">
-                  {selectedBook.language}
-                </span>
-                <h3 className="font-serif text-3xl font-bold text-[#153A34] mb-2">
-                  {selectedBook.title}
-                </h3>
-                <p className="text-lg font-medium text-gray-600 mb-6">By {selectedBook.author || 'Unknown Author'}</p>
-                
-                <div className="prose prose-sm sm:prose-base text-gray-600 mb-8 max-w-none flex-1">
-                  <p>{selectedBook.description || 'No description available for this book.'}</p>
                 </div>
-                                <div className="mt-auto pt-6 border-t border-gray-100">
+                
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Description</h4>
+                    <p className="text-[#2A3D34] leading-relaxed text-sm">
+                      {selectedBook.description || 'No description available for this book.'}
+                    </p>
+                  </div>
+                  
                   {readError && openingBookId === selectedBook.id && (
-                    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-                      <p className="text-sm text-red-600 font-medium">{readError}</p>
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                      {readError}
                     </div>
                   )}
-                  {pdfErrorUrl && (
-                    <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center justify-between">
-                      <p className="text-sm text-yellow-800 font-medium">Popup blocked. Click to open directly:</p>
+                  
+                  {pdfErrorUrl && openingBookId === selectedBook.id && (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="text-sm text-amber-800 font-medium mb-3">
+                        Your browser blocked the PDF from opening in a new tab.
+                      </p>
                       <a 
-                        href={pdfErrorUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="px-4 py-2 bg-yellow-600 text-white font-bold rounded-lg hover:bg-yellow-700 transition-colors whitespace-nowrap ml-4 text-sm"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const savedScrollPosition = window.scrollY;
-                          sessionStorage.setItem('bookScrollPosition', savedScrollPosition.toString());
-                          const fallbackWin = window.open(pdfErrorUrl, '_blank');
-                          if (fallbackWin) {
-                            const timer = setInterval(() => {
-                              if (fallbackWin.closed) {
-                                clearInterval(timer);
-                                requestAnimationFrame(() => {
-                                  window.scrollTo({
-                                    top: savedScrollPosition,
-                                    behavior: "instant"
-                                  });
-                                });
-                              }
+                        href={pdfErrorUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg transition-colors"
+                        onClick={() => {
+                          setPdfErrorUrl(null);
+                          setOpeningBookId(null);
+                          const savedScroll = sessionStorage.getItem('bookScrollPosition');
+                          if (savedScroll) {
+                            setTimeout(() => {
+                              window.scrollTo({
+                                top: parseInt(savedScroll, 10),
+                                behavior: 'instant'
+                              });
                             }, 500);
-                          } else {
-                            // If blocked again, fallback to normal link behavior
-                            window.location.href = pdfErrorUrl;
                           }
                         }}
                       >

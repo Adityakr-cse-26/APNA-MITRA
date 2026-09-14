@@ -123,7 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[#F4F7F4]/95 backdrop-blur-md border-b border-[#D8E2DA] transition-all">
+    <header className="sticky top-0 z-50 bg-[#FAFAFA]/95 backdrop-blur-md border-b border-[#E2E4E0] transition-all">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
           <div className="flex items-center">
@@ -135,7 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {user?.user_metadata?.full_name && (
               <button 
                 onClick={onOpenRegistration}
-                className="hidden lg:flex flex-col ml-4 pl-4 border-l-2 border-[#D8E2DA] justify-center hover:bg-[#1F4E46]/5 px-3 py-1.5 rounded-xl cursor-pointer transition-all text-left"
+                className="hidden lg:flex flex-col ml-4 pl-4 border-l-2 border-[#E2E4E0] justify-center hover:bg-[#1F4E46]/5 px-3 py-1.5 rounded-xl cursor-pointer transition-all text-left"
                 title="View Patient Profile"
               >
                 <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider leading-none mb-1">Welcome</span>
@@ -280,7 +280,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onOpenRegistration}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#153A34] bg-white hover:bg-[#EEF3EA] rounded-xl border border-[#D8E2DA] transition shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#153A34] bg-white hover:bg-[#F3F5F4] rounded-xl border border-[#E2E4E0] transition shadow-2xs"
                 title="View &amp; Edit Profile or Caretaker Settings"
               >
                 <span>{currentLang === 'hi' ? '👤 प्रोफ़ाइल' : currentLang === 'bn' ? '👤 প্রোফাইল' : '👤 Profile'}</span>
@@ -311,12 +311,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {/* Font scaling control */}
-            <div className="flex items-center bg-white rounded-xl border border-[#D8E2DA] p-1 shadow-sm" title="Adjust Text Size">
+            <div className="flex items-center bg-white rounded-xl border border-[#E2E4E0] p-1 shadow-sm" title="Adjust Text Size">
               <button
                 type="button"
                 onClick={() => onFontScaleChange(0.9)}
                 className={`px-2 py-1 text-xs rounded-lg font-medium transition ${
-                  fontScale === 0.9 ? "bg-[#1F4E46] text-white" : "text-[#5B6B60] hover:bg-[#EEF3EA]"
+                  fontScale === 0.9 ? "bg-[#1F4E46] text-white" : "text-[#5B6B60] hover:bg-[#F3F5F4]"
                 }`}
               >
                 A-
@@ -325,7 +325,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={() => onFontScaleChange(1.0)}
                 className={`px-2 py-1 text-xs rounded-lg font-medium transition ${
-                  fontScale === 1.0 ? "bg-[#1F4E46] text-white" : "text-[#5B6B60] hover:bg-[#EEF3EA]"
+                  fontScale === 1.0 ? "bg-[#1F4E46] text-white" : "text-[#5B6B60] hover:bg-[#F3F5F4]"
                 }`}
               >
                 A
@@ -334,7 +334,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={() => onFontScaleChange(1.15)}
                 className={`px-2 py-1 text-xs rounded-lg font-medium transition ${
-                  fontScale === 1.15 ? "bg-[#1F4E46] text-white" : "text-[#5B6B60] hover:bg-[#EEF3EA]"
+                  fontScale === 1.15 ? "bg-[#1F4E46] text-white" : "text-[#5B6B60] hover:bg-[#F3F5F4]"
                 }`}
               >
                 A+
@@ -342,7 +342,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Language Switcher */}
-            <div className="flex items-center bg-white rounded-xl border border-[#D8E2DA] p-1 shadow-sm">
+            <div className="flex items-center bg-white rounded-xl border border-[#E2E4E0] p-1 shadow-sm">
               {(["en", "hi", "bn"] as Language[]).map((lang) => (
                 <button
                   key={lang}
@@ -351,7 +351,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition ${
                     currentLang === lang
                       ? "bg-[#1F4E46] text-white shadow-sm"
-                      : "text-[#5B6B60] hover:text-[#1F4E46] hover:bg-[#EEF3EA]"
+                      : "text-[#5B6B60] hover:text-[#1F4E46] hover:bg-[#F3F5F4]"
                   }`}
                 >
                   {lang === "en" ? "EN" : lang === "hi" ? "हिं" : "বাং"}
@@ -365,7 +365,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => onLanguageChange(currentLang === "en" ? "hi" : currentLang === "hi" ? "bn" : "en")}
-              className="px-2.5 py-1 text-xs font-bold bg-white border border-[#D8E2DA] rounded-lg text-[#1F4E46]"
+              className="px-2.5 py-1 text-xs font-bold bg-white border border-[#E2E4E0] rounded-lg text-[#1F4E46]"
             >
               {currentLang.toUpperCase()}
             </button>
@@ -382,8 +382,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
-        <div className="sm:hidden bg-white border-b border-[#D8E2DA] px-4 pt-3 pb-6 space-y-3 shadow-xl">
-          <div className="flex items-center justify-between pb-3 border-b border-[#EEF3EA]">
+        <div className="sm:hidden bg-white border-b border-[#E2E4E0] px-4 pt-3 pb-6 space-y-3 shadow-xl">
+          <div className="flex items-center justify-between pb-3 border-b border-[#F3F5F4]">
             <span className="text-xs font-medium text-[#5B6B60]">Language:</span>
             <div className="flex gap-1">
               {(["en", "hi", "bn"] as Language[]).map((lang) => (
@@ -394,7 +394,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setMobileMenuOpen(false);
                   }}
                   className={`px-3 py-1 text-xs font-bold rounded-lg ${
-                    currentLang === lang ? "bg-[#1F4E46] text-white" : "bg-[#EEF3EA] text-[#5B6B60]"
+                    currentLang === lang ? "bg-[#1F4E46] text-white" : "bg-[#F3F5F4] text-[#5B6B60]"
                   }`}
                 >
                   {langLabels[lang]}
@@ -413,7 +413,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ? "bg-rose-600 text-white font-bold shadow-xs"
                   : alertCount > 0
                   ? "bg-rose-50 text-rose-800 font-bold border border-rose-200"
-                  : "hover:bg-[#EEF3EA] text-[#22312B]"
+                  : "hover:bg-[#F3F5F4] text-[#22312B]"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -434,7 +434,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`px-3.5 py-2.5 rounded-xl transition flex items-center justify-between ${
                 activeSection === "health"
                   ? "bg-[#1F4E46] text-white font-bold shadow-xs"
-                  : "hover:bg-[#EEF3EA] text-[#22312B]"
+                  : "hover:bg-[#F3F5F4] text-[#22312B]"
               }`}
             >
               <span>{currentLang === 'hi' ? '2. देखभाल और स्वास्थ्य रिकॉर्ड' : currentLang === 'bn' ? '২. যত্ন এবং স্বাস্থ্য রেকর্ড' : '2. Care & Health Records'}</span>
@@ -448,7 +448,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`px-3.5 py-2.5 rounded-xl transition flex items-center justify-between ${
                 activeSection === "games"
                   ? "bg-[#1F4E46] text-white font-bold shadow-xs"
-                  : "hover:bg-[#EEF3EA] text-[#22312B]"
+                  : "hover:bg-[#F3F5F4] text-[#22312B]"
               }`}
             >
               <span>{currentLang === 'hi' ? '3. दिमागी खेल और दैनिक गतिविधि' : currentLang === 'bn' ? '৩. ব্রেইন গেম এবং দৈনন্দিন কাজ' : '3. Brain Games & Daily Activity'}</span>
@@ -462,7 +462,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`px-3.5 py-2.5 rounded-xl transition flex items-center justify-between ${
                 activeSection === "books"
                   ? "bg-[#1F4E46] text-white font-bold shadow-xs"
-                  : "hover:bg-[#EEF3EA] text-[#22312B]"
+                  : "hover:bg-[#F3F5F4] text-[#22312B]"
               }`}
             >
               <span>{currentLang === 'hi' ? 'अनुशंसित किताबें' : currentLang === 'bn' ? 'প্রস্তাবিত বই' : 'Recommended Books'}</span>
@@ -476,7 +476,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`px-3.5 py-2.5 rounded-xl transition flex items-center justify-between ${
                 activeSection === "nearby-directory"
                   ? "bg-[#1F4E46] text-white font-bold shadow-xs"
-                  : "hover:bg-[#EEF3EA] text-[#22312B]"
+                  : "hover:bg-[#F3F5F4] text-[#22312B]"
               }`}
             >
               <span>{currentLang === 'hi' ? '4. निकटवर्ती डॉक्टर और केमिस्ट' : currentLang === 'bn' ? '৪. কাছাকাছি ডাক্তার ও রসায়নবিদ' : '4. Nearby Doctors & Chemists'}</span>
@@ -490,7 +490,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`px-3.5 py-2.5 rounded-xl transition flex items-center justify-between ${
                 activeSection === "schemes"
                   ? "bg-[#1F4E46] text-white font-bold shadow-xs"
-                  : "hover:bg-[#EEF3EA] text-[#22312B]"
+                  : "hover:bg-[#F3F5F4] text-[#22312B]"
               }`}
             >
               <span>{currentLang === 'hi' ? '5. सरकारी कल्याणकारी योजनाएं' : currentLang === 'bn' ? '৫. সরকারি কল্যাণ প্রকল্প' : '5. Government Welfare Schemes'}</span>
@@ -533,7 +533,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setMobileMenuOpen(false);
                   onOpenRegistration();
                 }}
-                className="w-full py-2.5 bg-white border border-[#D8E2DA] text-[#153A34] font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-2xs"
+                className="w-full py-2.5 bg-white border border-[#E2E4E0] text-[#153A34] font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-2xs"
               >
                 <span>{currentLang === 'hi' ? '👤 वरिष्ठ प्रोफ़ाइल और केयरटेकर सेटिंग्स' : currentLang === 'bn' ? '👤 সিনিয়র প্রোফাইল এবং কেয়ারটেকার সেটিংস' : '👤 Senior Profile & Caretaker Settings'}</span>
               </button>

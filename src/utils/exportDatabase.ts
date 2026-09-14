@@ -1,3 +1,4 @@
+import { fetchVitalsData } from '../services/db';
 import { supabase } from '../supabase';
 import { User } from '@supabase/supabase-js';
 
@@ -29,7 +30,12 @@ export const exportDatabaseToCSV = async (user: User | null) => {
     }
 
     // 2. Fetch Vitals
-    const { data: vitals } = await supabase.from('vitals').select('*').eq('patient_id', user.id);
+    let vitals = [];
+    try {
+      vitals = await fetchVitalsData(user.id);
+    } catch(err) {
+      console.warn("Vitals export skipped due to error");
+    }
     if (vitals && vitals.length > 0) {
       csvRows.push("--- VITALS HISTORY ---");
       csvRows.push("Date/Time,Type,Value,Unit,Status");

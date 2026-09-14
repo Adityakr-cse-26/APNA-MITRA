@@ -73,10 +73,10 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-[#D8E2DA] my-8 animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-[#E2E4E0] my-8 animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#EEF3EA]">
+        <div className="flex items-center justify-between pb-4 border-b border-[#F3F5F4]">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-800 border border-blue-200 flex items-center justify-center">
               <Pill className="w-6 h-6" />
@@ -92,14 +92,14 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-[#EEF3EA] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
+            className="w-9 h-9 rounded-full bg-[#F3F5F4] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
           >
             ✕
           </button>
         </div>
 
         {/* Adherence summary banner */}
-        <div className="my-5 p-4 bg-gradient-to-r from-[#DCEAE4] to-[#EEF3EA] rounded-2xl border border-[#B4C6BB] flex items-center justify-between">
+        <div className="my-5 p-4 bg-gradient-to-r from-[#DCEAE4] to-[#F3F5F4] rounded-2xl border border-[#B4C6BB] flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-[#1F4E46] uppercase tracking-wider block">
               Today's Adherence
@@ -121,8 +121,8 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
               key={med.id}
               className={`p-4 rounded-2xl border transition flex items-center justify-between gap-3 ${
                 med.takenToday
-                  ? "bg-[#F4F7F4] border-emerald-300 opacity-90"
-                  : "bg-white border-[#D8E2DA] shadow-xs"
+                  ? "bg-[#FAFAFA] border-emerald-300 opacity-90"
+                  : "bg-white border-[#E2E4E0] shadow-xs"
               }`}
             >
               <div className="flex items-start gap-3">
@@ -144,7 +144,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
                     <h4 className={`text-sm font-bold ${med.takenToday ? "line-through text-[#5B6B60]" : "text-[#153A34]"}`}>
                       {med.name}
                     </h4>
-                    <span className="text-xs font-semibold px-2 py-0.5 bg-[#EEF3EA] text-[#1F4E46] rounded-full">
+                    <span className="text-xs font-semibold px-2 py-0.5 bg-[#F3F5F4] text-[#1F4E46] rounded-full">
                       {med.dosage}
                     </span>
                   </div>
@@ -172,7 +172,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
           ))}
 
           {medications.length === 0 && (
-            <div className="p-6 text-center text-xs text-[#5B6B60] bg-[#F4F7F4] rounded-2xl border border-dashed border-[#D8E2DA]">
+            <div className="p-6 text-center text-xs text-[#5B6B60] bg-[#FAFAFA] rounded-2xl border border-dashed border-[#E2E4E0]">
               No medications added yet. Click &quot;Add New Medicine&quot; below to setup reminders.
             </div>
           )}
@@ -180,7 +180,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
 
         {/* Add New Form */}
         {showAddForm ? (
-          <form onSubmit={handleAddMed} className="mt-5 p-4 bg-[#F4F7F4] rounded-2xl border border-[#D8E2DA] space-y-3">
+          <form onSubmit={handleAddMed} className="mt-5 p-4 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0] space-y-3">
             <div className="flex justify-between items-center">
               <h4 className="text-xs font-bold text-[#153A34] uppercase tracking-wider">
                 Add Prescription Medicine
@@ -201,7 +201,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Medicine Name (e.g. Amlodipine, Metformin, Shelcal)"
-                className="w-full px-3.5 py-2.5 bg-white border border-[#D8E2DA] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#1F4E46]"
+                className="w-full px-3.5 py-2.5 bg-white border border-[#E2E4E0] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#1F4E46]"
               />
             </div>
 
@@ -212,7 +212,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
                   value={dosage}
                   onChange={(e) => setDosage(e.target.value)}
                   placeholder="Dosage (e.g. 5mg, 1 tablet)"
-                  className="w-full px-3.5 py-2 bg-white border border-[#D8E2DA] rounded-xl text-xs focus:outline-none"
+                  className="w-full px-3.5 py-2 bg-white border border-[#E2E4E0] rounded-xl text-xs focus:outline-none"
                 />
               </div>
 
@@ -220,7 +220,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
                 <select
                   value={timing}
                   onChange={(e) => setTiming(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-white border border-[#D8E2DA] rounded-xl text-xs focus:outline-none"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E4E0] rounded-xl text-xs focus:outline-none"
                 >
                   <option value="Morning">Morning (Breakfast)</option>
                   <option value="Afternoon">Afternoon (Lunch)</option>
@@ -236,7 +236,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
                 placeholder="Instructions (e.g. After Food with warm water)"
-                className="w-full px-3.5 py-2 bg-white border border-[#D8E2DA] rounded-xl text-xs focus:outline-none"
+                className="w-full px-3.5 py-2 bg-white border border-[#E2E4E0] rounded-xl text-xs focus:outline-none"
               />
             </div>
 
@@ -251,7 +251,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
           <button
             type="button"
             onClick={() => setShowAddForm(true)}
-            className="w-full mt-4 py-3 bg-[#EEF3EA] hover:bg-[#DCEAE4] text-[#1F4E46] font-semibold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 border border-[#B4C6BB] transition"
+            className="w-full mt-4 py-3 bg-[#F3F5F4] hover:bg-[#DCEAE4] text-[#1F4E46] font-semibold text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 border border-[#B4C6BB] transition"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Medicine</span>
@@ -259,7 +259,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
         )}
 
         {/* Footer info */}
-        <div className="mt-4 pt-3 border-t border-[#EEF3EA] flex justify-between items-center text-[11px] text-[#5B6B60]">
+        <div className="mt-4 pt-3 border-t border-[#F3F5F4] flex justify-between items-center text-[11px] text-[#5B6B60]">
           <span>🔔 Reminders will chime at scheduled hours</span>
           <button
             type="button"

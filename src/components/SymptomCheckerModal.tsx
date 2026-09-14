@@ -112,10 +112,10 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-[#D8E2DA] my-8 animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-[#E2E4E0] my-8 animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#EEF3EA]">
+        <div className="flex items-center justify-between pb-4 border-b border-[#F3F5F4]">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-teal-50 text-[#1F4E46] border border-teal-200 flex items-center justify-center">
               <Stethoscope className="w-6 h-6" />
@@ -131,7 +131,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-[#EEF3EA] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
+            className="w-9 h-9 rounded-full bg-[#F3F5F4] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
           >
             ✕
           </button>
@@ -151,7 +151,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
                     key={i}
                     type="button"
                     onClick={() => setSymptoms(qs)}
-                    className="text-[11px] bg-[#EEF3EA] hover:bg-[#DCEAE4] text-[#1F4E46] px-3 py-1 rounded-xl transition text-left"
+                    className="text-[11px] bg-[#F3F5F4] hover:bg-[#DCEAE4] text-[#1F4E46] px-3 py-1 rounded-xl transition text-left"
                   >
                     + {qs}
                   </button>
@@ -164,7 +164,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
                 value={symptoms}
                 onChange={(e) => setSymptoms(e.target.value)}
                 placeholder="e.g. Mild headache and knee stiffness for 2 days, worse in morning..."
-                className="w-full p-3.5 bg-[#F4F7F4] border border-[#D8E2DA] rounded-2xl text-sm focus:bg-white focus:border-[#1F4E46] focus:outline-none"
+                className="w-full p-3.5 bg-[#FAFAFA] border border-[#E2E4E0] rounded-2xl text-sm focus:bg-white focus:border-[#1F4E46] focus:outline-none"
               />
             </div>
 
@@ -177,7 +177,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
                 <select
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F4F7F4] border border-[#D8E2DA] rounded-xl text-sm text-[#22312B] focus:bg-white focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[#FAFAFA] border border-[#E2E4E0] rounded-xl text-sm text-[#22312B] focus:bg-white focus:outline-none"
                 >
                   <option value="Today (Less than 24 hours)">Today (&lt; 24 hours)</option>
                   <option value="2-3 days">2 - 3 days</option>
@@ -193,7 +193,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
                 <select
                   value={ageGroup}
                   onChange={(e) => setAgeGroup(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F4F7F4] border border-[#D8E2DA] rounded-xl text-sm text-[#22312B] focus:bg-white focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[#FAFAFA] border border-[#E2E4E0] rounded-xl text-sm text-[#22312B] focus:bg-white focus:outline-none"
                 >
                   <option value="Senior (60+ years)">Senior Citizen (60+ yrs)</option>
                   <option value="Adult (18-59 years)">Adult (18 - 59 yrs)</option>
@@ -218,7 +218,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
                 max={10}
                 value={severity}
                 onChange={(e) => setSeverity(Number(e.target.value))}
-                className="w-full accent-[#1F4E46] h-2 bg-[#D8E2DA] rounded-lg cursor-pointer"
+                className="w-full accent-[#1F4E46] h-2 bg-[#E2E4E0] rounded-lg cursor-pointer"
               />
             </div>
 
@@ -236,7 +236,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
                     className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
                       existingConditions.includes(cond)
                         ? "bg-[#1F4E46] text-white border-[#1F4E46]"
-                        : "bg-[#F4F7F4] text-[#5B6B60] border-[#D8E2DA] hover:bg-white"
+                        : "bg-[#FAFAFA] text-[#5B6B60] border-[#E2E4E0] hover:bg-white"
                     }`}
                   >
                     {existingConditions.includes(cond) ? "✓ " : "+ "}
@@ -293,7 +293,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
             </div>
 
             {/* Summary */}
-            <div className="p-4 bg-[#F4F7F4] rounded-2xl border border-[#D8E2DA]">
+            <div className="p-4 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0]">
               <h4 className="font-bold text-sm text-[#153A34] mb-1">Assessment Overview</h4>
               <p className="text-xs sm:text-sm text-[#3A4E45] leading-relaxed">
                 {result.summary}
@@ -301,7 +301,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
             </div>
 
             {/* Comfort & Safe Home Care */}
-            <div className="p-4 bg-white rounded-2xl border border-[#D8E2DA]">
+            <div className="p-4 bg-white rounded-2xl border border-[#E2E4E0]">
               <h5 className="font-bold text-xs text-[#153A34] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-amber-600" />
                 Comfort & Safe Home Care
@@ -344,7 +344,7 @@ export const SymptomCheckerModal: React.FC<SymptomCheckerModalProps> = ({ user,
               <button
                 type="button"
                 onClick={() => setResult(null)}
-                className="flex-1 py-3 text-sm font-semibold text-[#1F4E46] bg-[#EEF3EA] hover:bg-[#DCEAE4] rounded-xl flex items-center justify-center gap-1.5"
+                className="flex-1 py-3 text-sm font-semibold text-[#1F4E46] bg-[#F3F5F4] hover:bg-[#DCEAE4] rounded-xl flex items-center justify-center gap-1.5"
               >
                 <RotateCcw className="w-4 h-4" />
                 Check Another Symptom

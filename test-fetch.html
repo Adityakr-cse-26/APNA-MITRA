@@ -1,0 +1,13 @@
+<script>
+try {
+  const originalFetch = window.fetch;
+  Object.defineProperty(window, 'fetch', {
+    value: function() { return originalFetch.apply(this, arguments); },
+    configurable: true,
+    writable: true
+  });
+  console.log("Success");
+} catch (e) {
+  console.log("Error:", e.message);
+}
+</script>

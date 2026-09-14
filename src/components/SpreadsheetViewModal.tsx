@@ -1,3 +1,5 @@
+import { formatDateTime } from "../utils/healthCalculations";
+import { fetchVitalsData } from "../services/db";
 import React, { useState, useEffect } from "react";
 import { X, Table2, Activity, Pill, Calendar as CalendarIcon, ClipboardList, HeartPulse } from "lucide-react";
 import { User } from "@supabase/supabase-js";
@@ -24,8 +26,12 @@ export const SpreadsheetViewModal: React.FC<SpreadsheetViewModalProps> = ({ onCl
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const { data: vitalsList } = await supabase.from('vitals').select('*').eq('patient_id', user.id);
-        if (vitalsList) setVitals(vitalsList);
+        try {
+          const vList = await fetchVitalsData(user.id);
+          setVitals(vList);
+        } catch (err) {
+          console.error("Vitals error", err);
+        }
         
         const { data: medsList } = await supabase.from('medications').select('*').eq('patient_id', user.id);
         if (medsList) setMedications(medsList);
@@ -49,9 +55,9 @@ export const SpreadsheetViewModal: React.FC<SpreadsheetViewModalProps> = ({ onCl
 
   return (
     <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-5 border-b border-[#EEF3EA] flex justify-between items-center bg-[#F8FAF8]">
+        <div className="p-5 border-b border-[#F3F5F4] flex justify-between items-center bg-[#F8FAF8]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[#1F4E46] flex items-center justify-center">
               <Table2 className="w-5 h-5 text-white" />
@@ -63,14 +69,14 @@ export const SpreadsheetViewModal: React.FC<SpreadsheetViewModalProps> = ({ onCl
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-[#EEF3EA] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
+            className="w-9 h-9 rounded-full bg-[#F3F5F4] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 p-3 bg-white border-b border-[#EEF3EA] overflow-x-auto">
+        <div className="flex gap-1 p-3 bg-white border-b border-[#F3F5F4] overflow-x-auto">
           <button
             onClick={() => setActiveTab("vitals")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
@@ -119,23 +125,23 @@ export const SpreadsheetViewModal: React.FC<SpreadsheetViewModalProps> = ({ onCl
               Loading Spreadsheet...
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-[#D8E2DA] shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-[#E2E4E0] shadow-sm overflow-hidden">
               <table className="w-full text-left border-collapse text-xs">
                 {activeTab === "vitals" && (
                   <>
-                    <thead className="bg-[#EEF3EA] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
+                    <thead className="bg-[#F3F5F4] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
                       <tr>
-                        <th className="p-3 border-b border-[#D8E2DA]">Date/Time</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Type</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Value</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Status</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Date/Time</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Type</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Value</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {vitals.length === 0 ? <tr><td colSpan={4} className="p-5 text-center text-stone-500">No data found</td></tr> : null}
                       {vitals.map(v => (
-                        <tr key={v.id} className="border-b border-[#EEF3EA] hover:bg-stone-50">
-                          <td className="p-3 font-mono text-[#3A4E45]">{v.timestamp}</td>
+                        <tr key={v.id} className="border-b border-[#F3F5F4] hover:bg-stone-50">
+                          <td className="p-3 font-mono text-[#3A4E45]">{formatDateTime(v.timestamp)}</td>
                           <td className="p-3 font-bold text-[#1F4E46] uppercase">{v.type}</td>
                           <td className="p-3 font-mono">{v.value} {v.unit}</td>
                           <td className="p-3">
@@ -150,18 +156,18 @@ export const SpreadsheetViewModal: React.FC<SpreadsheetViewModalProps> = ({ onCl
                 )}
                 {activeTab === "medications" && (
                   <>
-                    <thead className="bg-[#EEF3EA] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
+                    <thead className="bg-[#F3F5F4] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
                       <tr>
-                        <th className="p-3 border-b border-[#D8E2DA]">Medicine Name</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Dosage</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Timing</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Taken Today</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Medicine Name</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Dosage</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Timing</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Taken Today</th>
                       </tr>
                     </thead>
                     <tbody>
                       {medications.length === 0 ? <tr><td colSpan={4} className="p-5 text-center text-stone-500">No data found</td></tr> : null}
                       {medications.map(m => (
-                        <tr key={m.id} className="border-b border-[#EEF3EA] hover:bg-stone-50">
+                        <tr key={m.id} className="border-b border-[#F3F5F4] hover:bg-stone-50">
                           <td className="p-3 font-bold text-[#1F4E46]">{m.name}</td>
                           <td className="p-3 text-[#3A4E45]">{m.dosage}</td>
                           <td className="p-3 text-[#3A4E45]">{m.timing}</td>
@@ -173,18 +179,18 @@ export const SpreadsheetViewModal: React.FC<SpreadsheetViewModalProps> = ({ onCl
                 )}
                 {activeTab === "appointments" && (
                   <>
-                    <thead className="bg-[#EEF3EA] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
+                    <thead className="bg-[#F3F5F4] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
                       <tr>
-                        <th className="p-3 border-b border-[#D8E2DA]">Date & Time</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Doctor</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Hospital</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Status</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Date & Time</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Doctor</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Hospital</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {appointments.length === 0 ? <tr><td colSpan={4} className="p-5 text-center text-stone-500">No data found</td></tr> : null}
                       {appointments.map(a => (
-                        <tr key={a.id} className="border-b border-[#EEF3EA] hover:bg-stone-50">
+                        <tr key={a.id} className="border-b border-[#F3F5F4] hover:bg-stone-50">
                           <td className="p-3 font-mono text-[#3A4E45]">{a.appointment_date} {a.appointment_time}</td>
                           <td className="p-3 font-bold text-[#1F4E46]">{a.doctorName}</td>
                           <td className="p-3 text-[#3A4E45]">{a.hospital}</td>
@@ -196,17 +202,17 @@ export const SpreadsheetViewModal: React.FC<SpreadsheetViewModalProps> = ({ onCl
                 )}
                 {activeTab === "checkins" && (
                   <>
-                    <thead className="bg-[#EEF3EA] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
+                    <thead className="bg-[#F3F5F4] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
                       <tr>
-                        <th className="p-3 border-b border-[#D8E2DA]">Date</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Mood</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Notes</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Date</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Mood</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Notes</th>
                       </tr>
                     </thead>
                     <tbody>
                       {checkins.length === 0 ? <tr><td colSpan={3} className="p-5 text-center text-stone-500">No data found</td></tr> : null}
                       {checkins.map(c => (
-                        <tr key={c.id} className="border-b border-[#EEF3EA] hover:bg-stone-50">
+                        <tr key={c.id} className="border-b border-[#F3F5F4] hover:bg-stone-50">
                           <td className="p-3 font-mono text-[#3A4E45]">{c.date}</td>
                           <td className="p-3 font-bold uppercase">{c.mood}</td>
                           <td className="p-3 text-[#3A4E45]">{c.notes}</td>
@@ -217,18 +223,18 @@ export const SpreadsheetViewModal: React.FC<SpreadsheetViewModalProps> = ({ onCl
                 )}
               {activeTab === "health_checks" && (
                   <>
-                    <thead className="bg-[#EEF3EA] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
+                    <thead className="bg-[#F3F5F4] text-[#153A34] uppercase font-bold text-[10px] tracking-wider">
                       <tr>
-                        <th className="p-3 border-b border-[#D8E2DA]">Date</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Symptoms</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Urgency</th>
-                        <th className="p-3 border-b border-[#D8E2DA]">Summary</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Date</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Symptoms</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Urgency</th>
+                        <th className="p-3 border-b border-[#E2E4E0]">Summary</th>
                       </tr>
                     </thead>
                     <tbody>
                       {healthChecks.length === 0 ? <tr><td colSpan={4} className="p-5 text-center text-stone-500">No data found</td></tr> : null}
                       {healthChecks.map(hc => (
-                        <tr key={hc.id} className="border-b border-[#EEF3EA] hover:bg-stone-50">
+                        <tr key={hc.id} className="border-b border-[#F3F5F4] hover:bg-stone-50">
                           <td className="p-3 font-mono text-[#3A4E45]">{hc.createdAt?.seconds ? new Date(hc.createdAt.seconds * 1000).toLocaleDateString() : "Just now"}</td>
                           <td className="p-3 font-bold">{hc.symptoms}</td>
                           <td className="p-3">

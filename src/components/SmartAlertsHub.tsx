@@ -146,7 +146,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
   };
 
   return (
-    <section id="smart-alerts" className="py-16 md:py-24 bg-[#F8FAF8] border-b border-[#D8E2DA]">
+    <section id="smart-alerts" className="py-16 md:py-24 bg-[#F8FAF8] border-b border-[#E2E4E0]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
@@ -187,7 +187,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
               onClick={() => setSoundEnabled(!soundEnabled)}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-2 ${
                 soundEnabled 
-                  ? "bg-white text-[#1F4E46] border-[#D8E2DA] hover:bg-[#EEF3EA]" 
+                  ? "bg-white text-[#1F4E46] border-[#E2E4E0] hover:bg-[#F3F5F4]" 
                   : "bg-gray-100 text-gray-400 border-gray-200"
               }`}
               title="Toggle audio chime on alerts"
@@ -211,12 +211,12 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           
           {/* Card 1: Vitals Health Status */}
-          <div className={`p-6 rounded-3xl border transition-all ${
+          <div className={`p-6 rounded-2xl border transition-all ${
             activeHealthAlerts.some((a) => a.severity === "CRITICAL")
               ? "bg-rose-50 border-rose-200 shadow-sm"
               : activeHealthAlerts.length > 0
               ? "bg-amber-50/70 border-amber-200"
-              : "bg-white border-[#D8E2DA]"
+              : "bg-white border-[#E2E4E0]"
           }`}>
             <div className="flex items-center justify-between mb-4">
               <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
@@ -239,7 +239,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
           </div>
 
           {/* Card 2: Today's Medication Adherence */}
-          <div className="p-6 rounded-3xl border border-[#D8E2DA] bg-white shadow-xs">
+          <div className="p-6 rounded-2xl border border-[#E2E4E0] bg-white shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-800 border border-blue-100 flex items-center justify-center">
                 <Pill className="w-5 h-5" />
@@ -264,7 +264,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
           </div>
 
           {/* Card 3: Caregiver Link */}
-          <div className="p-6 rounded-3xl border border-[#D8E2DA] bg-white shadow-xs">
+          <div className="p-6 rounded-2xl border border-[#E2E4E0] bg-white shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-100 flex items-center justify-center">
                 <UserCheck className="w-5 h-5" />
@@ -284,7 +284,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
         </div>
 
         {/* Tab Filters */}
-        <div className="flex items-center gap-2 mb-6 border-b border-[#D8E2DA] pb-3">
+        <div className="flex items-center gap-2 mb-6 border-b border-[#E2E4E0] pb-3">
           {[
             { id: "all", label: `All Alerts (${totalAlertsCount})` },
             { id: "health", label: `Health & Vitals (${activeHealthAlerts.length})` },
@@ -297,7 +297,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
               className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
                 activeTab === tab.id
                   ? "bg-[#1F4E46] text-white shadow-xs"
-                  : "bg-white text-[#5B6B60] hover:bg-[#EEF3EA] border border-[#D8E2DA]"
+                  : "bg-white text-[#5B6B60] hover:bg-[#F3F5F4] border border-[#E2E4E0]"
               }`}
             >
               {tab.label}
@@ -321,7 +321,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
                 return (
                   <div
                     key={alert.id}
-                    className={`rounded-3xl p-6 sm:p-7 border transition-all ${
+                    className={`rounded-2xl p-6 sm:p-7 border transition-all ${
                       alert.severity === "CRITICAL"
                         ? "bg-rose-50/90 border-rose-300 shadow-md"
                         : "bg-amber-50/80 border-amber-300 shadow-sm"
@@ -408,7 +408,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
                       <button
                         type="button"
                         onClick={() => onOpenMitraChat(`My recorded ${alert.vitalType.toUpperCase()} is ${alert.currentValue}. What should I do right now to stabilize it safely?`)}
-                        className="px-4 py-2.5 bg-white hover:bg-[#EEF3EA] border border-[#D8E2DA] text-[#1F4E46] rounded-xl text-xs font-bold transition flex items-center gap-2"
+                        className="px-4 py-2.5 bg-white hover:bg-[#F3F5F4] border border-[#E2E4E0] text-[#1F4E46] rounded-xl text-xs font-bold transition flex items-center gap-2"
                       >
                         <MessageSquare className="w-4 h-4 text-[#E8A33D]" />
                         <span>Ask Mitra AI About This Reading</span>
@@ -418,7 +418,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
                       <button
                         type="button"
                         onClick={onOpenDoctorPrep}
-                        className="px-4 py-2.5 bg-white hover:bg-[#EEF3EA] border border-[#D8E2DA] text-[#1F4E46] rounded-xl text-xs font-bold transition flex items-center gap-2"
+                        className="px-4 py-2.5 bg-white hover:bg-[#F3F5F4] border border-[#E2E4E0] text-[#1F4E46] rounded-xl text-xs font-bold transition flex items-center gap-2"
                       >
                         <Stethoscope className="w-4 h-4 text-[#1F4E46]" />
                         <span>Generate Doctor Brief</span>
@@ -466,14 +466,14 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
                 return (
                   <div
                     key={medAlert.id}
-                    className={`rounded-3xl p-5 sm:p-6 border transition-all ${
+                    className={`rounded-2xl p-5 sm:p-6 border transition-all ${
                       isMissed
                         ? "bg-rose-50/70 border-rose-200"
                         : isDue
                         ? "bg-amber-50/70 border-amber-200 shadow-sm"
                         : isTaken
-                        ? "bg-white/90 border-[#D8E2DA] opacity-80"
-                        : "bg-white border-[#D8E2DA]"
+                        ? "bg-white/90 border-[#E2E4E0] opacity-80"
+                        : "bg-white border-[#E2E4E0]"
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -485,7 +485,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
                             ? "bg-rose-500 text-white"
                             : isDue
                             ? "bg-amber-500 text-white animate-bounce"
-                            : "bg-[#EEF3EA] text-[#1F4E46]"
+                            : "bg-[#F3F5F4] text-[#1F4E46]"
                         }`}>
                           <Pill className="w-5 h-5" />
                         </div>
@@ -577,7 +577,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
                         <button
                           type="button"
                           onClick={() => onOpenMitraChat(`I missed my dose of ${medAlert.medicationName} (${medAlert.dosage}) scheduled for ${medAlert.scheduledTime}. What should I do?`)}
-                          className="p-2.5 bg-white hover:bg-[#EEF3EA] border border-[#D8E2DA] text-[#1F4E46] rounded-xl text-xs font-bold transition"
+                          className="p-2.5 bg-white hover:bg-[#F3F5F4] border border-[#E2E4E0] text-[#1F4E46] rounded-xl text-xs font-bold transition"
                           title="Ask Mitra AI guidance for this medicine"
                         >
                           <MessageSquare className="w-4 h-4" />
@@ -598,7 +598,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
 
           {/* Empty state if no alerts */}
           {activeHealthAlerts.length === 0 && dueMedications.length === 0 && missedMedications.length === 0 && (
-            <div className="p-8 sm:p-12 text-center bg-white rounded-3xl border border-[#D8E2DA]">
+            <div className="p-8 sm:p-12 text-center bg-white rounded-2xl border border-[#E2E4E0]">
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 mx-auto flex items-center justify-center mb-4">
                 <ShieldCheck className="w-8 h-8" />
               </div>
@@ -621,7 +621,7 @@ export const SmartAlertsHub: React.FC<SmartAlertsHubProps> = ({
         </div>
 
         {/* Simulation & Diagnostic Testing Box for Demo / User Verification */}
-        <div className="p-6 bg-white rounded-3xl border border-[#D8E2DA] shadow-xs">
+        <div className="p-6 bg-white rounded-2xl border border-[#E2E4E0] shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div>
               <span className="text-xs font-bold text-[#1F4E46] uppercase tracking-wider block">

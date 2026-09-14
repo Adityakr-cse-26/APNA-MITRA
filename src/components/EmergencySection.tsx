@@ -12,30 +12,91 @@ import {
   Phone
 } from "lucide-react";
 import { Language, FamilyContact } from "../types";
+import { getCurrentLocation } from "../utils/geolocation";
+import { User } from "@supabase/supabase-js";
+import { supabase } from "../supabase";
 import { translations } from "../data/translations";
 
 interface EmergencySectionProps {
   currentLang: Language;
   contacts: FamilyContact[];
+  user: User;
 }
 
 export const EmergencySection: React.FC<EmergencySectionProps> = ({
   currentLang,
   contacts,
+  user,
 }) => {
   const t = translations[currentLang];
   const [sosSent, setSosSent] = useState(false);
+  const [sosMessage, setSosMessage] = useState("");
   const [showIceCard, setShowIceCard] = useState(false);
   const [bloodGroup, setBloodGroup] = useState("B+");
   const [allergies, setAllergies] = useState("None reported / Penicillin sensitive");
   const [chronicConditions, setChronicConditions] = useState("Hypertension (Managed)");
 
-  const handleTriggerSOS = () => {
+  const handleTriggerSOS = async () => {
     setSosSent(true);
-    import("../utils/audio").then((m) => m.playSiren());
-    setTimeout(() => {
-      alert("🚨 Emergency SOS Alert simulated: Location (28.6139° N, 77.2090° E) & ICE details sent to saved family contacts!");
-    }, 200);
+    setSosMessage("Sending SOS...");
+    import("../utils/audio").then((m) => {
+        if (m.playSiren) m.playSiren();
+    }).catch(() => {});
+
+    let loc = null;
+    try {
+      loc = await getCurrentLocation();
+    } catch(e) {
+      console.warn("Could not get location", e);
+    }
+    
+    try {
+      const { data: primaryCaretaker } = await supabase
+        .from('caretakers')
+        .select('*')
+        .eq('patient_id', user.id)
+        .eq('is_primary', true)
+        .maybeSingle();
+
+      if (!primaryCaretaker) {
+        alert("🚨 Emergency SOS Alert simulated: Please add an emergency contact to broadcast real alerts!");
+        return;
+      }
+      
+      const { data: alertData, error: insertError } = await supabase.from('emergency_alerts').insert([{
+        patient_id: user.id,
+        emergency_contact_name: primaryCaretaker.name,
+        emergency_contact_phone: primaryCaretaker.phone,
+        emergency_contact_relationship: primaryCaretaker.relation || primaryCaretaker.relationship || 'Primary Contact',
+        alert_type: "SOS",
+        status: "created",
+        notification_status: "pending",
+        location_lat: loc ? loc.latitude : null,
+        location_lng: loc ? loc.longitude : null,
+        location_accuracy: loc ? loc.accuracy : null,
+        location_timestamp: loc ? loc.timestamp : null
+      }]).select('id').single();
+
+      if (insertError) {
+        alert("Unable to create SOS alert. Please try again.");
+      } else {
+        await supabase.from('notifications').insert([{
+          patient_id: user.id,
+          patient_name: 'Patient',
+          title: "🚨 Emergency SOS Alert",
+          message: "Emergency SOS Alert",
+          type: "SOS",
+          is_read: false
+        }]);
+
+        await supabase.functions.invoke('send-sos-sms', {
+          body: { alert_id: alertData.id }
+        });
+        setSosMessage(loc ? "📍 Location shared with Primary Caretaker" : "⚠️ SOS sent, but location was unavailable.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const emergencyNumbers = [
@@ -50,7 +111,7 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Main Emergency Alert Banner */}
-        <article className="bg-gradient-to-br from-[#B54834] via-[#9E3927] to-[#7E291A] text-white rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden mb-12">
+        <article id="guardian-alert" className="bg-gradient-to-br from-[#B54834] via-[#9E3927] to-[#7E291A] text-white rounded-2xl p-8 sm:p-12 shadow-2xl relative overflow-hidden mb-12">
           
           <div className="max-w-3xl space-y-5">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/20 text-white text-xs font-bold uppercase tracking-wider backdrop-blur-xs">
@@ -68,13 +129,14 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
 
             {/* Big Action Buttons */}
             <div className="flex flex-wrap items-center gap-4 pt-4">
-              <a
-                href="#guardian-alert"
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); handleTriggerSOS(); }}
                 className="px-8 py-4 bg-white hover:bg-rose-50 active:scale-95 text-[#B54834] font-serif font-bold text-lg sm:text-xl rounded-2xl shadow-2xl flex items-center gap-3 transition"
               >
                 <AlertTriangle className="w-6 h-6 text-rose-600 animate-bounce" />
                 <span>🚨 Trigger Guardian SOS &amp; Location</span>
-              </a>
+              </button>
 
               <a
                 href="#guardian-alert"
@@ -116,7 +178,7 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
             <div className="mt-6 p-4 bg-white/20 border border-white/40 rounded-2xl flex items-center justify-between text-xs sm:text-sm">
               <span className="flex items-center gap-2 font-medium">
                 <Check className="w-5 h-5 text-emerald-300 shrink-0" />
-                Alert broadcasted to contacts (Rahul &amp; Priya) with live GPS.
+                {sosMessage}
               </span>
               <button
                 onClick={() => setSosSent(false)}
@@ -143,7 +205,7 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
             {emergencyNumbers.map((em, idx) => (
               <div
                 key={idx}
-                className="bg-white rounded-3xl p-5 border border-[#F6DCD3] shadow-sm flex flex-col justify-between"
+                className="bg-white rounded-2xl p-5 border border-[#F6DCD3] shadow-sm flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -172,7 +234,7 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
           </div>
 
           {/* Caretaker / Relative Numbers (Flowchart: 3 numbers can be saved, 1 at least mandatory, one-tap call) */}
-          <div className="bg-white rounded-3xl p-6 border border-[#F6DCD3] shadow-sm space-y-4">
+          <div className="bg-white rounded-2xl p-6 border border-[#F6DCD3] shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-[#F6DCD3] pb-3">
               <div>
                 <h4 className="font-serif text-lg font-bold text-[#153A34] flex items-center gap-2">
@@ -226,8 +288,8 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
 
         {/* ICE (In Case of Emergency) Card */}
         {showIceCard && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-rose-300 shadow-xl max-w-3xl mx-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-[#EEF3EA] mb-6">
+          <div className="bg-white rounded-2xl p-6 sm:p-8 border-2 border-rose-300 shadow-xl max-w-3xl mx-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-[#F3F5F4] mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-bold">
                   ICE
@@ -243,14 +305,14 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="px-3.5 py-1.5 bg-[#EEF3EA] hover:bg-[#DCEAE4] text-[#1F4E46] rounded-xl text-xs font-bold"
+                className="px-3.5 py-1.5 bg-[#F3F5F4] hover:bg-[#DCEAE4] text-[#1F4E46] rounded-xl text-xs font-bold"
               >
                 Print Card
               </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <div className="p-3.5 bg-[#F4F7F4] rounded-2xl border border-[#D8E2DA]">
+              <div className="p-3.5 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0]">
                 <span className="text-[10px] font-bold text-[#5B6B60] uppercase block">Blood Group</span>
                 <input
                   type="text"
@@ -260,7 +322,7 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
                 />
               </div>
 
-              <div className="p-3.5 bg-[#F4F7F4] rounded-2xl border border-[#D8E2DA]">
+              <div className="p-3.5 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0]">
                 <span className="text-[10px] font-bold text-[#5B6B60] uppercase block">Known Allergies</span>
                 <input
                   type="text"
@@ -270,7 +332,7 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
                 />
               </div>
 
-              <div className="p-3.5 bg-[#F4F7F4] rounded-2xl border border-[#D8E2DA]">
+              <div className="p-3.5 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0]">
                 <span className="text-[10px] font-bold text-[#5B6B60] uppercase block">Key Conditions</span>
                 <input
                   type="text"
@@ -290,7 +352,7 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
                 {contacts.map((c) => (
                   <div
                     key={c.id}
-                    className="p-3.5 bg-[#F4F7F4] rounded-2xl border border-[#D8E2DA] flex items-center justify-between"
+                    className="p-3.5 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0] flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-[#1F4E46] text-white flex items-center justify-center text-xs font-bold">

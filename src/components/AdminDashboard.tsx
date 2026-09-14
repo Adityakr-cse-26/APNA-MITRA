@@ -85,7 +85,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }
         {activeTab === 'overview' && (
           <div className="space-y-6 max-w-6xl mx-auto">
             
-  <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm mb-8 relative overflow-hidden">
+  <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm mb-8 relative overflow-hidden">
     <div className="absolute top-0 right-0 p-8 opacity-5">
       <Activity className="w-48 h-48 text-indigo-900" />
     </div>
@@ -129,7 +129,7 @@ const DoctorsManager = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<any>(null);
-  const [formData, setFormData] = useState({ name: '', specialization: '', availability: '', email: '', phone: '', status: 'active' });
+  const [formData, setFormData] = useState({ name: '', specialization: '', available_days: '', available_time_start: '', available_time_end: '', email: '', phone: '', status: 'active' });
 
   useEffect(() => { fetchDoctors(); }, []);
 
@@ -142,10 +142,17 @@ const DoctorsManager = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    const dataToSave = {
+      ...formData,
+      // Ensure available_days is properly formatted if it's meant to be a string or array
+      // In the database it seems it might be stored as an array or string
+      available_days: formData.available_days.split(',').map(d => d.trim()),
+    };
+    
     if (editingDoctor) {
-      await supabase.from('doctors').update(formData).eq('id', editingDoctor.id);
+      await supabase.from('doctors').update(dataToSave).eq('id', editingDoctor.id);
     } else {
-      await supabase.from('doctors').insert([formData]);
+      await supabase.from('doctors').insert([dataToSave]);
     }
     setIsModalOpen(false);
     fetchDoctors();
@@ -160,13 +167,31 @@ const DoctorsManager = () => {
 
   const openAdd = () => {
     setEditingDoctor(null);
-    setFormData({ name: '', specialization: '', availability: '', email: '', phone: '', status: 'active' });
+    setFormData({ name: '', specialization: '', available_days: '', available_time_start: '', available_time_end: '', email: '', phone: '', status: 'active' });
     setIsModalOpen(true);
   };
 
   const openEdit = (d: any) => {
     setEditingDoctor(d);
-    setFormData({ name: d.name || '', specialization: d.specialization || '', availability: d.availability || '', email: d.email || '', phone: d.phone || '', status: d.status || 'active' });
+    
+    // Handle parsing the available_days whether it's stored as array or string
+    let parsedDays = '';
+    if (Array.isArray(d.available_days)) {
+      parsedDays = d.available_days.join(', ');
+    } else if (typeof d.available_days === 'string') {
+      parsedDays = d.available_days.replace(/[\[\]"]/g, '');
+    }
+    
+    setFormData({ 
+      name: d.name || '', 
+      specialization: d.specialization || '', 
+      available_days: parsedDays, 
+      available_time_start: d.available_time_start || '', 
+      available_time_end: d.available_time_end || '', 
+      email: d.email || '', 
+      phone: d.phone || '', 
+      status: d.status || 'active' 
+    });
     setIsModalOpen(true);
   };
 
@@ -186,21 +211,27 @@ const DoctorsManager = () => {
               <tr>
                 <th className="px-6 py-4">Name</th>
                 <th className="px-6 py-4">Specialization</th>
-                <th className="px-6 py-4">Availability</th>
+                <th className="px-6 py-4">Available Day</th>
+                <th className="px-6 py-4">Start Time</th>
+                <th className="px-6 py-4">End Time</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500">Loading...</td></tr>
               ) : doctors.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">No doctors found. Add one to get started.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500">No doctors found. Add one to get started.</td></tr>
               ) : doctors.map(d => (
                 <tr key={d.id} className="hover:bg-gray-50 transition">
                   <td className="px-6 py-4 font-medium text-gray-900">{d.name}</td>
                   <td className="px-6 py-4 text-gray-600">{d.specialization}</td>
-                  <td className="px-6 py-4 text-gray-600">{d.availability}</td>
+                  <td className="px-6 py-4 text-gray-600">
+                    {Array.isArray(d.available_days) ? d.available_days.join(', ') : typeof d.available_days === 'string' ? d.available_days.replace(/[\[\]"]/g, '') : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 text-gray-600">{d.available_time_start || 'N/A'}</td>
+                  <td className="px-6 py-4 text-gray-600">{d.available_time_end || 'N/A'}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${d.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
                       {d.status || 'active'}
@@ -218,8 +249,8 @@ const DoctorsManager = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 my-8">
             <h3 className="text-xl font-bold text-gray-900 mb-4">{editingDoctor ? 'Edit Doctor' : 'Add Doctor'}</h3>
             <form onSubmit={handleSave} className="space-y-4">
               <div>
@@ -231,8 +262,18 @@ const DoctorsManager = () => {
                 <input required type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" value={formData.specialization} onChange={e => setFormData({...formData, specialization: e.target.value})} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Availability (e.g. Mon-Fri, 9AM-5PM)</label>
-                <input required type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" value={formData.availability} onChange={e => setFormData({...formData, availability: e.target.value})} />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Available Days (comma separated)</label>
+                <input required type="text" placeholder="e.g. Monday, Wednesday" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" value={formData.available_days} onChange={e => setFormData({...formData, available_days: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                  <input required type="text" placeholder="e.g. 10:00 AM" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" value={formData.available_time_start} onChange={e => setFormData({...formData, available_time_start: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                  <input required type="text" placeholder="e.g. 02:00 PM" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" value={formData.available_time_end} onChange={e => setFormData({...formData, available_time_end: e.target.value})} />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -311,8 +352,23 @@ const PatientsManager = () => {
 const AppointmentsManager = () => {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
-  useEffect(() => { fetchAppointments(); }, []);
+  useEffect(() => { 
+    fetchAppointments(); 
+    
+    // Subscribe to realtime updates for appointments
+    const channel = supabase.channel('admin-appointments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
+        fetchAppointments();
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const fetchAppointments = async () => {
     setLoading(true);
@@ -321,24 +377,94 @@ const AppointmentsManager = () => {
     setLoading(false);
   };
 
+  const handleConfirm = async (appointment: any) => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    
+    const { error } = await supabase.from('appointments').update({ status: 'confirmed' }).eq('id', appointment.id);
+    if (error) {
+      setErrorMsg(`Failed to confirm appointment: ${error.message}`);
+      return;
+    }
+    
+    setSuccessMsg('Appointment confirmed successfully.');
+    
+    // Notify patient
+    if (appointment.patient_id) {
+      await supabase.from('notifications').insert([{
+        patient_id: appointment.patient_id,
+        patient_name: appointment.patient_name || 'Patient',
+        title: "✅ Appointment Confirmed",
+        message: `Your appointment with Dr. ${appointment.doctor_name || 'Doctor'} on ${appointment.appointment_date} at ${appointment.appointment_time} has been confirmed.`,
+        type: "APPOINTMENT",
+        is_read: false
+      }]);
+    }
+    fetchAppointments();
+  };
+  
+  const handleReject = async (appointment: any) => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    
+    const reason = window.prompt("Optional rejection reason:", "");
+    if (reason === null) return; // User cancelled
+    
+    const updateData: any = { status: 'rejected' };
+    if (reason.trim()) {
+      updateData.rejection_reason = reason.trim();
+    }
+    
+    const { error } = await supabase.from('appointments').update(updateData).eq('id', appointment.id);
+    if (error) {
+      setErrorMsg(`Failed to reject appointment: ${error.message}`);
+      return;
+    }
+    
+    setSuccessMsg('Appointment rejected successfully.');
+    
+    // Notify patient
+    if (appointment.patient_id) {
+      await supabase.from('notifications').insert([{
+        patient_id: appointment.patient_id,
+        patient_name: appointment.patient_name || 'Patient',
+        title: "❌ Appointment Rejected",
+        message: `Your appointment with Dr. ${appointment.doctor_name || 'Doctor'} on ${appointment.appointment_date} at ${appointment.appointment_time} has been rejected.${reason.trim() ? ' Reason: ' + reason.trim() : ''}`,
+        type: "APPOINTMENT",
+        is_read: false
+      }]);
+    }
+    fetchAppointments();
+  };
+
   const handleStatusChange = async (id: string, newStatus: string) => {
-    await supabase.from('appointments').update({ status: newStatus }).eq('id', id);
+    setErrorMsg('');
+    setSuccessMsg('');
+    const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', id);
+    if (error) {
+       setErrorMsg(`Failed to update status: ${error.message}`);
+       return;
+    }
     fetchAppointments();
   };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <h2 className="text-2xl font-bold text-gray-800">Appointment Management</h2>
+      
+      {errorMsg && <div className="p-4 bg-red-50 text-red-700 rounded-xl border border-red-200">{errorMsg}</div>}
+      {successMsg && <div className="p-4 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200">{successMsg}</div>}
+
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-500">
               <tr>
-                <th className="px-6 py-4">Patient Name</th>
-                <th className="px-6 py-4">Doctor Name</th>
+                <th className="px-6 py-4">Patient Info</th>
+                <th className="px-6 py-4">Doctor Info</th>
                 <th className="px-6 py-4">Date & Time</th>
                 <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Update Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -346,35 +472,67 @@ const AppointmentsManager = () => {
                 <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading...</td></tr>
               ) : appointments.length === 0 ? (
                 <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">No appointments found.</td></tr>
-              ) : appointments.map(a => (
+              ) : appointments.map(a => {
+                const isPending = !a.status || a.status === 'pending';
+                return (
                 <tr key={a.id} className="hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 font-medium text-gray-900">{a.patient_name || 'N/A'}</td>
-                  <td className="px-6 py-4 text-gray-600">{a.doctor_name || 'N/A'}</td>
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-gray-900">{a.patient_name || 'N/A'}</div>
+                    <div className="text-sm text-gray-500">{a.patient_phone || ''}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-gray-900 font-medium">{a.doctor_name || 'N/A'}</div>
+                    <div className="text-sm text-gray-500">{a.notes || ''}</div>
+                  </td>
                   <td className="px-6 py-4 text-gray-600">
-                    {a.appointment_date ? new Date(a.appointment_date).toLocaleDateString() : 'N/A'} at {a.appointment_time || 'N/A'}
+                    {a.appointment_date ? new Date(a.appointment_date).toLocaleDateString() : 'N/A'} <br/>
+                    <span className="text-sm text-gray-500">{a.appointment_time || 'N/A'}</span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-1 text-xs font-bold rounded-full 
                       ${a.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' : 
                         a.status === 'completed' ? 'bg-blue-100 text-blue-800' : 
-                        a.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
-                      {a.status || 'pending'}
+                        a.status === 'rejected' || a.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
+                      {isPending ? 'pending' : a.status}
                     </span>
+                    {a.rejection_reason && (
+                      <div className="text-xs text-rose-600 mt-1 max-w-[150px] truncate" title={a.rejection_reason}>
+                        Reason: {a.rejection_reason}
+                      </div>
+                    )}
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <select 
-                      value={a.status || 'pending'} 
-                      onChange={(e) => handleStatusChange(a.id, e.target.value)}
-                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="confirmed">Confirmed</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+                  <td className="px-6 py-4 text-right space-y-2">
+                    {isPending ? (
+                      <div className="flex flex-col gap-2 items-end">
+                        <button 
+                          onClick={() => handleConfirm(a)}
+                          className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
+                        >
+                          ✓ Confirm
+                        </button>
+                        <button 
+                          onClick={() => handleReject(a)}
+                          className="px-3 py-1.5 text-xs font-semibold bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 transition"
+                        >
+                          ✕ Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <select 
+                        value={a.status || 'pending'} 
+                        onChange={(e) => handleStatusChange(a.id, e.target.value)}
+                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    )}
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
@@ -626,7 +784,7 @@ const BooksManager = () => {
       {/* Book Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative">
+          <div className="bg-white rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative">
             <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">
               <X className="w-6 h-6" />
             </button>

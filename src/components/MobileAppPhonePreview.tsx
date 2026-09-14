@@ -111,7 +111,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
         {/* Close Button on Top Right */}
         <button
           onClick={onClose}
-          className="absolute -top-10 right-0 sm:-right-10 w-9 h-9 rounded-full bg-white text-[#153A34] hover:bg-[#EEF3EA] flex items-center justify-center font-bold shadow-lg"
+          className="absolute -top-10 right-0 sm:-right-10 w-9 h-9 rounded-full bg-white text-[#153A34] hover:bg-[#F3F5F4] flex items-center justify-center font-bold shadow-lg"
           title="Close Phone View"
         >
           <X className="w-5 h-5" />
@@ -119,23 +119,23 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
 
         {/* Smartphone Frame */}
         <div 
-          className="w-[390px] max-w-full bg-[#EEF3EA] rounded-[44px] shadow-[0_30px_60px_-20px_rgba(21,58,52,0.5),0_0_0_12px_#101816] overflow-hidden relative border border-[#101816] flex flex-col h-[740px]"
+          className="w-[390px] max-w-full bg-[#F3F5F4] rounded-[44px] shadow-[0_30px_60px_-20px_rgba(21,58,52,0.5),0_0_0_12px_#101816] overflow-hidden relative border border-[#101816] flex flex-col h-[740px]"
           style={{ fontSize: `${15 * fontScale}px` }}
         >
           
           {/* Top Notch & Status Bar */}
-          <div className="bg-[#EEF3EA] pt-3 pb-1 px-6 flex justify-between items-center text-xs font-semibold text-[#22312B] relative select-none">
+          <div className="bg-[#F3F5F4] pt-3 pb-1 px-6 flex justify-between items-center text-xs font-semibold text-[#22312B] relative select-none">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-[#101816] rounded-b-2xl z-20"></div>
             <span>9:41</span>
             <span>🔋 100%</span>
           </div>
 
           {/* App Header inside phone */}
-          <div className="px-5 py-2 flex items-center justify-between border-b border-[#D8E2DA] bg-[#EEF3EA]">
+          <div className="px-5 py-2 flex items-center justify-between border-b border-[#E2E4E0] bg-[#F3F5F4]">
             <ApnaMitraLogo size="xs" variant="horizontal" showTagline={false} />
 
             {/* Language Switcher */}
-            <div className="flex bg-white p-0.5 rounded-full border border-[#D8E2DA]">
+            <div className="flex bg-white p-0.5 rounded-full border border-[#E2E4E0]">
               {(["en", "hi", "bn"] as Language[]).map((l) => (
                 <button
                   key={l}
@@ -157,7 +157,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
             {activeTab === "home" && (
               <div className="space-y-4 animate-in fade-in duration-200">
                 {/* Sun Greeting Card */}
-                <div className="bg-gradient-to-b from-[#1F4E46] to-[#153A34] text-white p-5 rounded-3xl shadow-md relative overflow-hidden">
+                <div className="bg-gradient-to-b from-[#1F4E46] to-[#153A34] text-white p-5 rounded-2xl shadow-md relative overflow-hidden">
                   <div className="absolute -top-3 -right-3 w-20 h-20 rounded-full bg-[#E8A33D]/90 blur-xs"></div>
                   <div className="text-[11px] uppercase tracking-wider text-[#DCEAE4]">
                     {currentLang === "hi" ? "सुप्रभात" : currentLang === "bn" ? "শুভ সকাল" : "Good morning"}
@@ -185,7 +185,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       onClick={() => setActiveTab("checkin")}
-                      className="bg-white p-3.5 rounded-2xl border border-[#D8E2DA] text-left hover:border-[#1F4E46] transition active:scale-97"
+                      className="bg-white p-3.5 rounded-2xl border border-[#E2E4E0] text-left hover:border-[#1F4E46] transition active:scale-97"
                     >
                       <span className="text-xl block mb-1">📝</span>
                       <h5 className="font-bold text-xs text-[#153A34]">
@@ -196,7 +196,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
 
                     <button
                       onClick={() => setActiveTab("connect")}
-                      className="bg-white p-3.5 rounded-2xl border border-[#D8E2DA] text-left hover:border-[#1F4E46] transition active:scale-97"
+                      className="bg-white p-3.5 rounded-2xl border border-[#E2E4E0] text-left hover:border-[#1F4E46] transition active:scale-97"
                     >
                       <span className="text-xl block mb-1">👨‍👩‍👧</span>
                       <h5 className="font-bold text-xs text-[#153A34]">
@@ -207,7 +207,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
 
                     <button
                       onClick={() => setActiveTab("awareness")}
-                      className="bg-white p-3.5 rounded-2xl border border-[#D8E2DA] text-left hover:border-[#1F4E46] transition active:scale-97"
+                      className="bg-white p-3.5 rounded-2xl border border-[#E2E4E0] text-left hover:border-[#1F4E46] transition active:scale-97"
                     >
                       <span className="text-xl block mb-1">🛡️</span>
                       <h5 className="font-bold text-xs text-[#153A34]">
@@ -218,7 +218,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
 
                     <button
                       onClick={() => setActiveTab("connect")}
-                      className="bg-white p-3.5 rounded-2xl border border-[#D8E2DA] text-left hover:border-[#1F4E46] transition active:scale-97"
+                      className="bg-white p-3.5 rounded-2xl border border-[#E2E4E0] text-left hover:border-[#1F4E46] transition active:scale-97"
                     >
                       <span className="text-xl block mb-1">📋</span>
                       <h5 className="font-bold text-xs text-[#153A34]">
@@ -262,7 +262,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
                         key={i}
                         onClick={() => setSelectedMood(em)}
                         className={`w-11 h-11 rounded-full border-2 flex items-center justify-center text-xl transition ${
-                          selectedMood === em ? "bg-[#FBE8C8] border-[#E8A33D] scale-110" : "bg-white border-[#D8E2DA]"
+                          selectedMood === em ? "bg-[#FBE8C8] border-[#E8A33D] scale-110" : "bg-white border-[#E2E4E0]"
                         }`}
                       >
                         {em}
@@ -285,7 +285,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
                     ].map((item, idx) => (
                       <label
                         key={idx}
-                        className="flex items-center gap-2.5 p-2.5 bg-white border border-[#D8E2DA] rounded-xl cursor-pointer"
+                        className="flex items-center gap-2.5 p-2.5 bg-white border border-[#E2E4E0] rounded-xl cursor-pointer"
                       >
                         <input
                           type="checkbox"
@@ -332,7 +332,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
                       key={cat.id}
                       onClick={() => setActiveAwarenessCat(cat.id as any)}
                       className={`flex-1 py-2 rounded-xl text-xs font-bold transition ${
-                        activeAwarenessCat === cat.id ? "bg-[#1F4E46] text-white" : "bg-white text-[#5B6B60] border border-[#D8E2DA]"
+                        activeAwarenessCat === cat.id ? "bg-[#1F4E46] text-white" : "bg-white text-[#5B6B60] border border-[#E2E4E0]"
                       }`}
                     >
                       {cat.label}
@@ -344,7 +344,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
                   {awarenessData[activeAwarenessCat].map((item, idx) => {
                     const [h, p] = (item as any)[currentLang] || item.en;
                     return (
-                      <div key={idx} className="p-3.5 bg-white rounded-2xl border border-[#D8E2DA] space-y-1">
+                      <div key={idx} className="p-3.5 bg-white rounded-2xl border border-[#E2E4E0] space-y-1">
                         <h5 className="font-bold text-xs text-[#153A34]">{h}</h5>
                         <p className="text-[11px] text-[#5B6B60] leading-normal">{p}</p>
                       </div>
@@ -366,7 +366,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
 
                 <div className="space-y-2">
                   <span className="text-xs font-bold text-[#35483F] uppercase block">Family Contacts</span>
-                  <div className="p-3 bg-white rounded-2xl border border-[#D8E2DA] flex items-center justify-between">
+                  <div className="p-3 bg-white rounded-2xl border border-[#E2E4E0] flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="w-9 h-9 rounded-full bg-[#DCEAE4] text-[#1F4E46] flex items-center justify-center font-bold text-sm">
                         R
@@ -381,7 +381,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
                     </a>
                   </div>
 
-                  <div className="p-3 bg-white rounded-2xl border border-[#D8E2DA] flex items-center justify-between">
+                  <div className="p-3 bg-white rounded-2xl border border-[#E2E4E0] flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="w-9 h-9 rounded-full bg-[#DCEAE4] text-[#1F4E46] flex items-center justify-center font-bold text-sm">
                         P
@@ -398,12 +398,12 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
                 </div>
 
                 {/* Share Status Toggle */}
-                <div className="p-3 bg-white rounded-2xl border border-[#D8E2DA] flex items-center justify-between text-xs">
+                <div className="p-3 bg-white rounded-2xl border border-[#E2E4E0] flex items-center justify-between text-xs">
                   <span>Share check-in status with family</span>
                   <button
                     onClick={() => setShareStatus(!shareStatus)}
                     className={`w-10 h-6 rounded-full transition relative p-0.5 ${
-                      shareStatus ? "bg-[#1F4E46]" : "bg-[#D8E2DA]"
+                      shareStatus ? "bg-[#1F4E46]" : "bg-[#E2E4E0]"
                     }`}
                   >
                     <div className={`w-5 h-5 rounded-full bg-white transition ${shareStatus ? "translate-x-4" : ""}`}></div>
@@ -420,7 +420,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
                     <button
                       onClick={() => setShareLocation(!shareLocation)}
                       className={`w-10 h-6 rounded-full transition relative p-0.5 ${
-                        shareLocation ? "bg-emerald-600" : "bg-[#D8E2DA]"
+                        shareLocation ? "bg-emerald-600" : "bg-[#E2E4E0]"
                       }`}
                     >
                       <div className={`w-5 h-5 rounded-full bg-white transition ${shareLocation ? "translate-x-4" : ""}`}></div>
@@ -448,7 +448,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
             {activeTab === "more" && (
               <div className="space-y-4 animate-in fade-in duration-200">
                 {/* Emergency SOS Big Panel */}
-                <div className="p-5 bg-gradient-to-b from-[#B54834] to-[#8F3625] text-white rounded-3xl text-center space-y-2">
+                <div className="p-5 bg-gradient-to-b from-[#B54834] to-[#8F3625] text-white rounded-2xl text-center space-y-2">
                   <span className="text-xs opacity-90 block">In case of emergency</span>
                   <button
                     onClick={() => showToast("🚨 Alert dispatched to Rahul & Priya")}
@@ -460,24 +460,24 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
                 </div>
 
                 {/* Text Sizing */}
-                <div className="p-3.5 bg-white rounded-2xl border border-[#D8E2DA] space-y-2">
+                <div className="p-3.5 bg-white rounded-2xl border border-[#E2E4E0] space-y-2">
                   <span className="text-xs font-bold text-[#35483F]">Text Size Adjustment</span>
                   <div className="flex gap-2 text-xs font-bold">
                     <button
                       onClick={() => setFontScale(0.9)}
-                      className={`flex-1 py-1.5 rounded-xl border ${fontScale === 0.9 ? "bg-[#1F4E46] text-white" : "bg-[#EEF3EA]"}`}
+                      className={`flex-1 py-1.5 rounded-xl border ${fontScale === 0.9 ? "bg-[#1F4E46] text-white" : "bg-[#F3F5F4]"}`}
                     >
                       Small
                     </button>
                     <button
                       onClick={() => setFontScale(1.0)}
-                      className={`flex-1 py-1.5 rounded-xl border ${fontScale === 1.0 ? "bg-[#1F4E46] text-white" : "bg-[#EEF3EA]"}`}
+                      className={`flex-1 py-1.5 rounded-xl border ${fontScale === 1.0 ? "bg-[#1F4E46] text-white" : "bg-[#F3F5F4]"}`}
                     >
                       Medium
                     </button>
                     <button
                       onClick={() => setFontScale(1.2)}
-                      className={`flex-1 py-1.5 rounded-xl border ${fontScale === 1.2 ? "bg-[#1F4E46] text-white" : "bg-[#EEF3EA]"}`}
+                      className={`flex-1 py-1.5 rounded-xl border ${fontScale === 1.2 ? "bg-[#1F4E46] text-white" : "bg-[#F3F5F4]"}`}
                     >
                       Large
                     </button>
@@ -514,7 +514,7 @@ export const MobileAppPhonePreview: React.FC<MobileAppPhonePreviewProps> = ({
           )}
 
           {/* Phone Bottom Navigation Bar */}
-          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-[#D8E2DA] flex justify-around py-2 px-1 z-20">
+          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-[#E2E4E0] flex justify-around py-2 px-1 z-20">
             {[
               { id: "home", icon: "🏠", label: "Home" },
               { id: "checkin", icon: "📝", label: "Check-in" },

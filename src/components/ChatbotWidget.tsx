@@ -19,6 +19,38 @@ export const ChatbotWidget: React.FC = () => {
     script.innerHTML = `
       import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
       
+      // Override fetch to swallow CORS/Failed to fetch errors from the offline n8n webhook
+      const originalFetch = window.fetch;
+      try {
+        Object.defineProperty(window, 'fetch', {
+          configurable: true,
+          writable: true,
+          value: async function(...args) {
+            if (typeof args[0] === 'string' && args[0].includes('n8n.cloud')) {
+              try {
+                const res = await originalFetch.apply(this, args);
+                if (!res.ok) {
+                  return new Response(JSON.stringify({ text: "I am currently offline. Please try again later.", sessionId: "123" }), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                }
+                return res;
+              } catch (err) {
+                console.warn("n8n webhook fetch failed, mocking response to avoid unhandled rejection.");
+                return new Response(JSON.stringify({ text: "I am currently offline. Please try again later.", sessionId: "123" }), {
+                  status: 200,
+                  headers: { 'Content-Type': 'application/json' }
+                });
+              }
+            }
+            return originalFetch.apply(this, args);
+          }
+        });
+      } catch (e) {
+        console.warn("Could not override fetch:", e);
+      }
+
       window.n8nChatInstance = createChat({
         webhookUrl: "https://dipa06.app.n8n.cloud/webhook/15425286-5dcc-4d03-ab4e-1c8f48df0cc5/chat",
         showWelcomeScreen: true,
@@ -172,7 +204,7 @@ export const ChatbotWidget: React.FC = () => {
         }
       `}</style>
       
-      <div className="relative flex items-center justify-center">
+      <div id="ai" className="relative flex items-center justify-center">
         <button
           onClick={handleOpenChat}
           className="p-1.5 bg-[#153A34] hover:bg-[#22312B] text-white rounded-full shadow-2xl flex items-center gap-2 border-2 border-white text-xs font-bold transition transform hover:scale-105 active:scale-95"

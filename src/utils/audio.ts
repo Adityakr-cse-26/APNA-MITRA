@@ -3,29 +3,40 @@ export const playSiren = () => {
   if (!AudioContext) return;
   
   const ctx = new AudioContext();
-  const osc = ctx.createOscillator();
+  
+  // Modern Emergency Alert style dual-tone (853 Hz & 960 Hz)
+  const osc1 = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
   const gain = ctx.createGain();
   
-  osc.type = 'square';
-  osc.connect(gain);
+  osc1.type = 'sawtooth';
+  osc2.type = 'sawtooth';
+  
+  osc1.connect(gain);
+  osc2.connect(gain);
   gain.connect(ctx.destination);
   
-  // Set initial frequency
-  osc.frequency.setValueAtTime(400, ctx.currentTime);
+  // Set dual-tone frequencies
+  osc1.frequency.value = 853;
+  osc2.frequency.value = 960;
   
+  // Create a pulsing pattern
   let now = ctx.currentTime;
-  // Create a 5-second alternating high/low siren loop
-  for (let i = 0; i < 5; i++) {
-    osc.frequency.setValueAtTime(400, now);
-    osc.frequency.linearRampToValueAtTime(800, now + 0.2);
-    osc.frequency.setValueAtTime(800, now + 0.5);
-    osc.frequency.linearRampToValueAtTime(400, now + 0.7);
-    now += 1.0;
+  gain.gain.setValueAtTime(0, now);
+  
+  for (let i = 0; i < 6; i++) {
+    // Sharp pulse on
+    gain.gain.setValueAtTime(0.15, now);
+    // Hold pulse
+    gain.gain.setValueAtTime(0.15, now + 0.4);
+    // Sharp pulse off
+    gain.gain.setValueAtTime(0, now + 0.45);
+    now += 0.7; // Wait before next pulse
   }
   
-  // Set volume (not too loud)
-  gain.gain.setValueAtTime(0.15, ctx.currentTime);
-  
-  osc.start(ctx.currentTime);
-  osc.stop(now);
+  osc1.start(ctx.currentTime);
+  osc2.start(ctx.currentTime);
+  osc1.stop(now);
+  osc2.stop(now);
 };
+

@@ -21,10 +21,10 @@ export const subscribeToUserProfile = (userId: string, callback: (profile: Elder
           if (!checkErr) {
             if (existing && existing.length > 0) {
               const { error: syncError } = await supabase.from('caretakers').update({ name: data.guardian_name || '', phone: data.guardian_phone || '' }).eq('id', existing[0].id);
-              if (syncError) console.error("Failed to synchronize caretaker on load:", syncError);
+              if (syncError) console.warn("Could not synchronize caretaker info:", syncError?.message || syncError);
             } else {
-              const { error: syncError } = await supabase.from('caretakers').insert([{ patient_id: userId, name: data.guardian_name || '', phone: data.guardian_phone || '' }]);
-              if (syncError) console.error("Failed to synchronize caretaker on load:", syncError);
+              const { error: syncError } = await supabase.from('caretakers').insert([{ patient_id: userId, name: data.guardian_name || '', phone: data.guardian_phone || '', is_primary: true }]);
+              if (syncError) console.warn("Could not synchronize caretaker info:", syncError?.message || syncError);
             }
           }
         }
@@ -45,6 +45,9 @@ export const subscribeToUserProfile = (userId: string, callback: (profile: Elder
           bloodGroup: data.blood_group || '',
           basicHealthInfo: data.health_info || '',
           passionsLifestyle: data.lifestyle || '',
+          emergency_contact_name: data.emergency_contact_name || '',
+          emergency_contact_phone: data.emergency_contact_phone || '',
+          emergency_contact_relationship: data.emergency_contact_relationship || '',
           caretakers: (caretakersData || []).map(c => ({
             id: c.id,
             name: c.name,
@@ -53,11 +56,12 @@ export const subscribeToUserProfile = (userId: string, callback: (profile: Elder
             age: c.age?.toString() || '',
             gender: c.gender || '',
             relation: c.relation || '',
+            isPrimary: !!c.is_primary,
           }))
         } as any);
       }
     } catch (error) {
-      console.error("Fetch profile error:", error);
+      console.warn("Could not fetch profile:", error?.message || error);
     }
   };
   
@@ -79,31 +83,80 @@ export const saveUserProfile = async (userId: string, profile: ElderlyProfile) =
         blood_group: profile.bloodGroup,
         health_info: profile.basicHealthInfo,
         lifestyle: profile.passionsLifestyle,
+        emergency_contact_name: profile.emergency_contact_name,
+        emergency_contact_phone: profile.emergency_contact_phone,
+        emergency_contact_relationship: profile.emergency_contact_relationship,
+        role: profile.role || 'patient',
       });
       
     if (error) throw error;
 
-    // Synchronize caretaker info from profiles to caretakers table on save
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('guardian_name, guardian_phone')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (profileData && (profileData.guardian_name || profileData.guardian_phone)) {
-      const { data: existing, error: checkErr } = await supabase.from('caretakers').select('id').eq('patient_id', userId).limit(1);
-      if (!checkErr) {
-        if (existing && existing.length > 0) {
-          const { error: syncError } = await supabase.from('caretakers').update({ name: profileData.guardian_name || '', phone: profileData.guardian_phone || '' }).eq('id', existing[0].id);
-          if (syncError) console.error("Failed to synchronize caretaker on save:", syncError);
-        } else {
-          const { error: syncError } = await supabase.from('caretakers').insert([{ patient_id: userId, name: profileData.guardian_name || '', phone: profileData.guardian_phone || '' }]);
-          if (syncError) console.error("Failed to synchronize caretaker on save:", syncError);
+    // 2. PRIMARY CARETAKER IDENTIFICATION & SAVE
+    // Synchronize caretakers array with caretakers table
+    if (profile.caretakers && profile.caretakers.length > 0) {
+      console.log("[saveUserProfile] Saving caretakers:", profile.caretakers);
+      
+      // Upsert all caretakers sent from the frontend
+      // For any caretaker marked as primary, others will be non-primary
+      let primaryFound = false;
+      const incomingIds = [];
+      
+      const caretakersToUpsert = profile.caretakers.map(c => {
+        let isPrimary = c.isPrimary;
+        if (isPrimary) {
+           if (primaryFound) isPrimary = false; // only one primary allowed
+           primaryFound = true;
         }
+        return {
+          id: c.id && c.id.length === 36 ? c.id : undefined, // Only use UUIDs if they exist, let Supabase generate if new
+          patient_id: userId,
+          name: c.name,
+          phone: c.phone,
+          email: c.email,
+          age: c.age ? parseInt(c.age) || null : null,
+          gender: c.gender,
+          relation: c.relation,
+          is_primary: isPrimary
+        };
+      });
+
+      console.log("[saveUserProfile] caretakersToUpsert:", caretakersToUpsert);
+      
+      for (const ct of caretakersToUpsert) {
+         if (ct.id) {
+           const { error: syncError } = await supabase.from('caretakers').update(ct).eq('id', ct.id);
+           if (syncError) {
+              console.error("Failed to update caretaker:", syncError);
+              throw syncError;
+           }
+           incomingIds.push(ct.id);
+         } else {
+           // For new inserts, remove the undefined id
+           const { id, ...insertData } = ct;
+           console.log("[saveUserProfile] Authenticated User ID:", userId);
+           console.log("[saveUserProfile] Inserting new caretaker payload:", insertData);
+           const { data: newRow, error: syncError } = await supabase.from('caretakers').insert([insertData]).select('id').single();
+           if (syncError) {
+              console.error("Failed to insert caretaker:", syncError);
+              throw syncError;
+           }
+           if (newRow) incomingIds.push(newRow.id);
+         }
       }
+      
+      // Cleanup any deleted caretakers
+      if (incomingIds.length > 0) {
+        await supabase.from('caretakers').delete().eq('patient_id', userId).not('id', 'in', `(${incomingIds.join(',')})`);
+      } else {
+        await supabase.from('caretakers').delete().eq('patient_id', userId);
+      }
+    } else {
+      // If array is empty, delete all caretakers for this patient
+      await supabase.from('caretakers').delete().eq('patient_id', userId);
     }
   } catch (error) {
     console.error("Failed to save profile:", error);
+    throw error;
   }
 };
 
@@ -111,22 +164,11 @@ export const subscribeToVitals = (userId: string, callback: (vitals: VitalReadin
   let isMounted = true;
   
   const fetchVitals = async () => {
-    const { data, error } = await supabase
-      .from('vitals')
-      .select('*')
-      .eq('patient_id', userId)
-      .order('timestamp', { ascending: false });
-      
-    if (!error && data && isMounted) {
-      callback(data.map(d => ({
-        id: d.id,
-        type: d.type,
-        value: d.value,
-        unit: d.unit,
-        timestamp: d.timestamp,
-        status: d.status,
-        note: d.note
-      }) as VitalReading));
+    try {
+      const data = await fetchVitalsData(userId);
+      if (isMounted) callback(data);
+    } catch(e) {
+      console.error(e);
     }
   };
   
@@ -149,8 +191,27 @@ export const saveVitalReading = async (userId: string, vital: VitalReading) => {
         note: vital.note
       }]);
     if (error) throw error;
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'PGRST205' || error?.code === 'PGRST116' || error?.code === '42703' || error?.message?.includes('schema cache') || error?.message?.includes('Failed to fetch')) {
+       console.warn("Vitals table not found. Falling back to local storage.", error);
+       
+       // Fallback to local storage
+       try {
+         const key = `apna_mitra_vitals_${userId}`;
+         const existing = localStorage.getItem(key);
+         const list = existing ? JSON.parse(existing) : [];
+         list.unshift({
+           ...vital,
+           timestamp: new Date().toISOString()
+         });
+         localStorage.setItem(key, JSON.stringify(list));
+         return;
+       } catch (e) {
+         console.error("Local storage fallback failed", e);
+       }
+    }
     console.error("Failed to save vital:", error);
+    throw error;
   }
 };
 
@@ -430,6 +491,218 @@ export const saveAppointment = async (userId: string, appointment: any) => {
     if (error) throw error;
   } catch (error) {
     console.error("Supabase Save Error:", error);
+    throw error;
+  }
+};
+
+// --- BRAIN GAMES POINTS SYSTEM ---
+
+export interface GameResult {
+  id?: string;
+  user_id: string;
+  game_id: string;
+  difficulty?: string;
+  score?: number;
+  points_earned: number;
+  content_id?: string;
+  accuracy?: number;
+  completion_status?: boolean;
+  played_at?: string;
+}
+
+export interface UserPoints {
+  user_id: string;
+  total_points: number;
+  current_level: string;
+  games_completed: number;
+  daily_streak: number;
+  last_played_at?: string;
+}
+
+export const saveGameResult = async (result: GameResult) => {
+  try {
+    const { data, error } = await supabase.from('game_results').insert([result]);
+    if (error) throw error;
+    
+    // Update user points
+    await updateUserPoints(result.user_id, result.points_earned);
+    
+    return data;
+  } catch (error) {
+    console.error("Save game result error:", error);
+  }
+};
+
+export const fetchUserPoints = async (userId: string) => {
+  try {
+    const { data, error } = await supabase.from('user_points').select('*').eq('user_id', userId).single();
+    if (error && error.code !== 'PGRST116') throw error; // PGRST116 is no rows returned
+    
+    if (!data) {
+       // Initialize if not exists
+       const initial: UserPoints = {
+         user_id: userId,
+         total_points: 0,
+         current_level: 'Bronze',
+         games_completed: 0,
+         daily_streak: 0,
+       };
+       await supabase.from('user_points').insert([initial]);
+       return initial;
+    }
+    
+    return data as UserPoints;
+  } catch (error) {
+    console.error("Fetch user points error:", error);
+    return null;
+  }
+};
+
+export const updateUserPoints = async (userId: string, pointsToAdd: number) => {
+  try {
+    const current = await fetchUserPoints(userId);
+    if (!current) return;
+    
+    const newTotal = current.total_points + pointsToAdd;
+    let newLevel = current.current_level;
+    
+    if (newTotal >= 1000) newLevel = 'Platinum';
+    else if (newTotal >= 500) newLevel = 'Gold';
+    else if (newTotal >= 200) newLevel = 'Silver';
+    else newLevel = 'Bronze';
+    
+    // Simple streak logic (could be improved with real dates)
+    let newStreak = current.daily_streak;
+    const now = new Date();
+    if (current.last_played_at) {
+       const lastPlayed = new Date(current.last_played_at);
+       const diffTime = Math.abs(now.getTime() - lastPlayed.getTime());
+       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+       
+       if (diffDays === 1 || diffDays === 0) { // Same day or next day
+         if(diffDays === 1) newStreak += 1;
+       } else {
+         newStreak = 1;
+       }
+    } else {
+       newStreak = 1;
+    }
+    
+    const updates = {
+      total_points: newTotal,
+      current_level: newLevel,
+      games_completed: current.games_completed + 1,
+      daily_streak: newStreak,
+      last_played_at: now.toISOString(),
+    };
+    
+    await supabase.from('user_points').update(updates).eq('user_id', userId);
+  } catch (error) {
+    console.error("Update user points error:", error);
+  }
+};
+
+export const fetchRecentGameResults = async (userId: string) => {
+  try {
+    const { data, error } = await supabase.from('game_results').select('*').eq('user_id', userId).order('played_at', { ascending: false }).limit(5);
+    if (error) throw error;
+    return data as GameResult[];
+  } catch (error) {
+    console.error("Fetch game results error:", error);
+    return [];
+  }
+};
+
+
+export const savePushSubscription = async (userId: string, subscription: PushSubscription) => {
+  try {
+    const subJSON = subscription.toJSON();
+    
+    // Find the primary caretaker for this patient
+    const { data: primaryCaretaker } = await supabase
+      .from('caretakers')
+      .select('id')
+      .eq('patient_id', userId)
+      .eq('is_primary', true)
+      .limit(1)
+      .maybeSingle();
+
+    let caretakerId = primaryCaretaker?.id;
+    if (!caretakerId) {
+      const { data: firstCaretaker } = await supabase
+        .from('caretakers')
+        .select('id')
+        .eq('patient_id', userId)
+        .limit(1)
+        .maybeSingle();
+      caretakerId = firstCaretaker?.id;
+    }
+
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert({
+        patient_uid: userId,
+        caretaker_id: caretakerId || null,
+        endpoint: subJSON.endpoint,
+        p256dh: subJSON.keys?.p256dh,
+        auth: subJSON.keys?.auth,
+      }, { onConflict: 'endpoint' });
+      
+    if (error) throw error;
+  } catch (error) {
+    console.error("Save Push Subscription Error:", error);
+    throw error;
+  }
+};
+
+export const checkPushSubscription = async (userId: string, endpoint: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('push_subscriptions')
+      .select('id')
+      .eq('patient_uid', userId)
+      .eq('endpoint', endpoint)
+      .maybeSingle();
+      
+    return !!data;
+  } catch (error) {
+    return false;
+  }
+};
+
+
+export const fetchVitalsData = async (userId: string): Promise<VitalReading[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('vitals')
+      .select('*')
+      .eq('patient_id', userId)
+      .order('timestamp', { ascending: false });
+      
+    if (error) throw error;
+    if (!data) return [];
+    
+    return data.map(d => ({
+      id: d.id,
+      type: d.type,
+      value: d.value,
+      unit: d.unit,
+      timestamp: d.timestamp,
+      status: d.status,
+      note: d.note
+    }) as VitalReading);
+  } catch (error: any) {
+    if (error?.code === 'PGRST205' || error?.code === 'PGRST116' || error?.code === '42703' || error?.message?.includes('schema cache') || error?.message?.includes('Failed to fetch')) {
+      console.warn("Vitals table not found. Using local storage fallback.");
+      try {
+        const key = `apna_mitra_vitals_${userId}`;
+        const existing = localStorage.getItem(key);
+        return existing ? JSON.parse(existing) : [];
+      } catch(e) {
+        return [];
+      }
+    }
+    console.error("Failed to fetch vitals:", error);
     throw error;
   }
 };

@@ -244,7 +244,7 @@ export const SeniorSchemesSection: React.FC<SeniorSchemesSectionProps> = ({ curr
     : schemes.filter((s) => s.category.includes(selectedCategory) || selectedCategory.includes(s.category));
 
   return (
-    <section id="schemes" className="py-16 md:py-24 bg-white border-b border-[#D8E2DA]">
+    <section id="schemes" className="py-16 md:py-24 bg-white border-b border-[#E2E4E0]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Heading */}
@@ -270,7 +270,7 @@ export const SeniorSchemesSection: React.FC<SeniorSchemesSectionProps> = ({ curr
               className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
                 selectedCategory === cat
                   ? "bg-[#1F4E46] text-white shadow-sm"
-                  : "bg-[#F4F7F4] text-[#5B6B60] hover:bg-[#EEF3EA] border border-[#D8E2DA]"
+                  : "bg-[#FAFAFA] text-[#5B6B60] hover:bg-[#F3F5F4] border border-[#E2E4E0]"
               }`}
             >
               {cat}
@@ -283,7 +283,7 @@ export const SeniorSchemesSection: React.FC<SeniorSchemesSectionProps> = ({ curr
           {filteredSchemes.map((scheme) => (
             <article
               key={scheme.id}
-              className="bg-[#F4F7F4] rounded-3xl p-6 sm:p-7 border border-[#D8E2DA] hover:border-[#1F4E46]/40 hover:shadow-lg transition-all flex flex-col justify-between"
+              className="bg-[#FAFAFA] rounded-2xl p-6 sm:p-7 border border-[#E2E4E0] hover:border-[#1F4E46]/40 hover:shadow-lg transition-all flex flex-col justify-between"
             >
               <div className="space-y-3.5">
                 <div className="flex items-center justify-between">
@@ -299,7 +299,7 @@ export const SeniorSchemesSection: React.FC<SeniorSchemesSectionProps> = ({ curr
                   {scheme.name}
                 </h3>
 
-                <div className="p-3 bg-white rounded-2xl border border-[#D8E2DA] space-y-1">
+                <div className="p-3 bg-white rounded-2xl border border-[#E2E4E0] space-y-1">
                   <span className="text-[10px] font-bold text-[#1F4E46] uppercase tracking-wider block">
                     Coverage &amp; Entitlement
                   </span>
@@ -318,7 +318,7 @@ export const SeniorSchemesSection: React.FC<SeniorSchemesSectionProps> = ({ curr
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-[#D8E2DA] flex items-center justify-between">
+              <div className="mt-6 pt-4 border-t border-[#E2E4E0] flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-[#1F4E46]">
                   <Phone className="w-3.5 h-3.5" />
                   <span>{scheme.contact}</span>
@@ -328,7 +328,7 @@ export const SeniorSchemesSection: React.FC<SeniorSchemesSectionProps> = ({ curr
                   href={scheme.officialUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 rounded-xl bg-white hover:bg-[#EEF3EA] border border-[#D8E2DA] text-[#1F4E46] text-xs font-semibold flex items-center gap-1 transition"
+                  className="p-2 rounded-xl bg-white hover:bg-[#F3F5F4] border border-[#E2E4E0] text-[#1F4E46] text-xs font-semibold flex items-center gap-1 transition"
                   title="Official portal"
                 >
                   <span>Portal</span>
@@ -340,7 +340,7 @@ export const SeniorSchemesSection: React.FC<SeniorSchemesSectionProps> = ({ curr
         </div>
 
         {/* National Helpline Banner */}
-        <div className="mt-12 p-6 sm:p-7 bg-[#1F4E46] text-white rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+        <div className="mt-12 p-6 sm:p-7 bg-[#1F4E46] text-white rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
           <div className="space-y-1 text-center md:text-left">
             <h4 className="font-serif text-xl sm:text-2xl font-bold flex items-center justify-center md:justify-start gap-2">
               <span>National Elder Helpline (Elderline)</span>

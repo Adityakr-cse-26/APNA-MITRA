@@ -173,7 +173,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({
   ];
 
   return (
-    <section id="features" className="py-16 md:py-24 bg-white border-y border-[#D8E2DA]">
+    <section id="features" className="py-16 md:py-24 bg-white border-y border-[#E2E4E0]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Heading */}
@@ -190,41 +190,43 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-          {features.map((item) => (
-            <article
-              key={item.id}
-              onClick={item.action}
-              className="group cursor-pointer bg-[#F4F7F4] hover:bg-white rounded-3xl p-7 border border-[#D8E2DA] hover:border-[#1F4E46]/40 shadow-sm hover:shadow-xl hover:shadow-[#1F4E46]/10 transition-all duration-300 flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-5">
-                  <div className="w-13 h-13 rounded-2xl bg-white group-hover:bg-[#EEF3EA] border border-[#D8E2DA] flex items-center justify-center text-2xl shadow-xs transition-colors">
-                    {item.icon}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 auto-rows-[minmax(180px,auto)]">
+          {features.map((item, index) => {
+            // Bento grid logic
+            let spanClass = "col-span-1 md:col-span-1 lg:col-span-1";
+            if (index === 0) spanClass = "col-span-1 md:col-span-2 lg:col-span-2";
+            else if (index === 3) spanClass = "col-span-1 md:col-span-2 lg:col-span-2";
+            else if (index === 5) spanClass = "col-span-1 md:col-span-3 lg:col-span-2";
+            else if (index === 6) spanClass = "col-span-1 md:col-span-3 lg:col-span-4 bg-rose-50 border-rose-200 hover:bg-rose-100"; // Emergency full width
+
+            return (
+              <article
+                key={item.id}
+                onClick={item.action}
+                className={`group cursor-pointer ${index === 6 ? '' : 'bg-[#FAFAFA] hover:bg-[#F3F5F4]'} rounded-2xl p-6 border ${index === 6 ? 'border-rose-200' : 'border-[#E2E4E0]'} hover:border-[#1F4E46]/30 transition-all duration-300 flex flex-col justify-between ${spanClass}`}
+              >
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`w-12 h-12 rounded-xl ${index === 6 ? 'bg-rose-100 text-rose-600' : 'bg-white text-[#153A34]'} border ${index === 6 ? 'border-rose-200' : 'border-[#E2E4E0]'} flex items-center justify-center text-xl transition-transform group-hover:scale-105`}>
+                      {item.icon}
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-md border ${item.color}`}>
+                      {item.tag}
+                    </span>
                   </div>
-                  <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${item.color}`}>
-                    {item.tag}
-                  </span>
+
+                  <h3 className={`font-serif text-lg md:text-xl font-bold ${index === 6 ? 'text-rose-700' : 'text-[#153A34]'} mb-2 group-hover:text-[#1F4E46] transition-colors flex items-center justify-between`}>
+                    <span>{item.title}</span>
+                  </h3>
+
+                  <p className={`text-sm ${index === 6 ? 'text-rose-600' : 'text-[#5B6B60]'} leading-relaxed mt-auto`}>
+                    {item.desc}
+                  </p>
                 </div>
-
-                <h3 className="font-serif text-xl font-bold text-[#153A34] mb-2.5 group-hover:text-[#1F4E46] transition-colors flex items-center justify-between">
-                  <span>{item.title}</span>
-                  <ArrowUpRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-[#1F4E46]" />
-                </h3>
-
-                <p className="text-sm text-[#5B6B60] leading-relaxed">
-                  {item.desc}
-                </p>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-[#E2ECE5] flex items-center justify-between text-xs font-semibold text-[#1F4E46]">
-                <span>Launch tool</span>
-                <span className="text-base font-bold transition-transform group-hover:translate-x-1">→</span>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
-
       </div>
     </section>
   );

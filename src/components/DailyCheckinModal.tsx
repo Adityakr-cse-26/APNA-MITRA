@@ -91,10 +91,10 @@ export const DailyCheckinModal: React.FC<DailyCheckinModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-[#D8E2DA] my-8 animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-[#E2E4E0] my-8 animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#EEF3EA]">
+        <div className="flex items-center justify-between pb-4 border-b border-[#F3F5F4]">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center text-xl">
               📝
@@ -110,7 +110,7 @@ export const DailyCheckinModal: React.FC<DailyCheckinModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-[#EEF3EA] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
+            className="w-9 h-9 rounded-full bg-[#F3F5F4] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
           >
             ✕
           </button>
@@ -171,7 +171,7 @@ export const DailyCheckinModal: React.FC<DailyCheckinModalProps> = ({
                     className={`py-3 rounded-2xl flex flex-col items-center gap-1 border transition ${
                       selectedMood === item.mood
                         ? "bg-[#FBE8C8] border-[#E8A33D] scale-105 shadow-xs"
-                        : "bg-[#F4F7F4] border-[#D8E2DA] hover:bg-white text-[#5B6B60]"
+                        : "bg-[#FAFAFA] border-[#E2E4E0] hover:bg-white text-[#5B6B60]"
                     }`}
                   >
                     <span className="text-2xl">{item.emoji}</span>
@@ -196,7 +196,7 @@ export const DailyCheckinModal: React.FC<DailyCheckinModalProps> = ({
                       className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition ${
                         isChecked
                           ? "bg-[#DCEAE4] border-[#1F4E46] text-[#153A34]"
-                          : "bg-[#F4F7F4] border-[#D8E2DA] text-[#4A5D54] hover:bg-white"
+                          : "bg-[#FAFAFA] border-[#E2E4E0] text-[#4A5D54] hover:bg-white"
                       }`}
                     >
                       <input
@@ -222,7 +222,7 @@ export const DailyCheckinModal: React.FC<DailyCheckinModalProps> = ({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="e.g. Went for a 20 min morning park walk, felt energetic"
-                className="w-full px-3.5 py-2.5 bg-[#F4F7F4] border border-[#D8E2DA] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#1F4E46]"
+                className="w-full px-3.5 py-2.5 bg-[#FAFAFA] border border-[#E2E4E0] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#1F4E46]"
               />
             </div>
 

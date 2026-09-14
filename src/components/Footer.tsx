@@ -35,16 +35,29 @@ export const Footer: React.FC<FooterProps> = ({ currentLang }) => {
                 <a href="#home" className="hover:text-white transition">Home</a>
               </li>
               <li>
-                <a href="#features" className="hover:text-white transition">Features</a>
-              </li>
-              <li>
                 <a href="#health" className="hover:text-white transition">Health Dashboard</a>
               </li>
               <li>
-                <a href="#ai" className="hover:text-white transition">Mitra AI Assistant</a>
+                <a href="#games" className="hover:text-white transition">Brain Games &amp; Activities</a>
+              </li>
+              <li>
+                <a href="#nearby-directory" className="hover:text-white transition">Nearby Services</a>
               </li>
               <li>
                 <a href="#schemes" className="hover:text-white transition">Senior Schemes</a>
+              </li>
+              <li>
+                <a 
+                  href="#ai" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const toggleBtn = document.querySelector('.chat-window-toggle') as HTMLButtonElement;
+                    if (toggleBtn) toggleBtn.click();
+                  }}
+                  className="hover:text-white transition cursor-pointer"
+                >
+                  Mitra AI Assistant
+                </a>
               </li>
             </ul>
           </div>
@@ -56,7 +69,7 @@ export const Footer: React.FC<FooterProps> = ({ currentLang }) => {
             </h4>
             <ul className="space-y-2 text-sm text-[#DCEAE4]">
               <li>
-                <a href="#emergency" className="hover:text-rose-200 text-rose-300 font-semibold transition">
+                <a href="#emergency-section" className="hover:text-rose-200 text-rose-300 font-semibold transition">
                   Emergency Help (112 / 108)
                 </a>
               </li>

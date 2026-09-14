@@ -111,10 +111,10 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-[#D8E2DA] my-8 animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-[#E2E4E0] my-8 animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#EEF3EA]">
+        <div className="flex items-center justify-between pb-4 border-b border-[#F3F5F4]">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center">
               <FileText className="w-6 h-6" />
@@ -130,7 +130,7 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-[#EEF3EA] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
+            className="w-9 h-9 rounded-full bg-[#F3F5F4] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
           >
             ✕
           </button>
@@ -154,7 +154,7 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
                       setImageBase64(null);
                       setImagePreview(null);
                     }}
-                    className="p-2.5 bg-[#F4F7F4] hover:bg-[#DCEAE4] border border-[#D8E2DA] text-left rounded-xl transition text-xs font-medium text-[#1F4E46]"
+                    className="p-2.5 bg-[#FAFAFA] hover:bg-[#DCEAE4] border border-[#E2E4E0] text-left rounded-xl transition text-xs font-medium text-[#1F4E46]"
                   >
                     📄 {sample.title}
                   </button>
@@ -172,7 +172,7 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
                 value={reportText}
                 onChange={(e) => setReportText(e.target.value)}
                 placeholder="Paste the numbers and markers from your lab report here..."
-                className="w-full p-3.5 bg-[#F4F7F4] border border-[#D8E2DA] rounded-2xl text-xs sm:text-sm font-mono text-[#22312B] focus:bg-white focus:border-[#1F4E46] focus:outline-none"
+                className="w-full p-3.5 bg-[#FAFAFA] border border-[#E2E4E0] rounded-2xl text-xs sm:text-sm font-mono text-[#22312B] focus:bg-white focus:border-[#1F4E46] focus:outline-none"
               />
             </div>
 
@@ -181,7 +181,7 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
               <label className="block text-xs font-bold text-[#35483F] uppercase mb-1.5">
                 Or Upload Lab Report Photo / PDF Document
               </label>
-              <label className="border-2 border-dashed border-[#D8E2DA] hover:border-[#1F4E46] bg-[#F4F7F4]/60 hover:bg-[#F4F7F4] rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition">
+              <label className="border-2 border-dashed border-[#E2E4E0] hover:border-[#1F4E46] bg-[#FAFAFA]/60 hover:bg-[#FAFAFA] rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer transition">
                 <Upload className="w-6 h-6 text-[#1F4E46] mb-1" />
                 <span className="text-xs font-semibold text-[#153A34]">Click to upload or drag image</span>
                 <span className="text-[11px] text-[#5B6B60]">Supports JPG, PNG, WebP lab sheets</span>
@@ -236,7 +236,7 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
           /* Results Breakdown */
           <div className="pt-4 space-y-5">
             {/* Title & Overview */}
-            <div className="p-4 bg-[#F4F7F4] rounded-2xl border border-[#D8E2DA]">
+            <div className="p-4 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0]">
               <div className="flex items-center justify-between mb-1.5">
                 <h4 className="font-serif font-bold text-base text-[#153A34]">{result.title}</h4>
                 <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
@@ -258,7 +258,7 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
                   {result.parameters.map((param, idx) => (
                     <div
                       key={idx}
-                      className="p-3 bg-white rounded-2xl border border-[#D8E2DA] shadow-2xs space-y-1"
+                      className="p-3 bg-white rounded-2xl border border-[#E2E4E0] shadow-2xs space-y-1"
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-xs sm:text-sm text-[#153A34]">{param.name}</span>
@@ -278,7 +278,7 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
                       <div className="text-[11px] text-[#5B6B60] flex justify-between">
                         <span>Standard Range: {param.standardRange}</span>
                       </div>
-                      <p className="text-xs text-[#4A5D54] pt-1 leading-normal border-t border-[#EEF3EA]">
+                      <p className="text-xs text-[#4A5D54] pt-1 leading-normal border-t border-[#F3F5F4]">
                         💡 {param.explanation}
                       </p>
                     </div>
@@ -301,7 +301,7 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
                 </ul>
               </div>
 
-              <div className="p-4 bg-white rounded-2xl border border-[#D8E2DA]">
+              <div className="p-4 bg-white rounded-2xl border border-[#E2E4E0]">
                 <h5 className="font-bold text-xs text-[#153A34] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-amber-600" />
                   Practical Lifestyle Guidance
@@ -319,7 +319,7 @@ eGFR: 78 mL/min/1.73m2 (Reference: > 60 mL/min)`,
               <button
                 type="button"
                 onClick={() => setResult(null)}
-                className="flex-1 py-3 text-sm font-semibold text-[#1F4E46] bg-[#EEF3EA] hover:bg-[#DCEAE4] rounded-xl flex items-center justify-center gap-1.5"
+                className="flex-1 py-3 text-sm font-semibold text-[#1F4E46] bg-[#F3F5F4] hover:bg-[#DCEAE4] rounded-xl flex items-center justify-center gap-1.5"
               >
                 <RotateCcw className="w-4 h-4" />
                 Analyze Another Report

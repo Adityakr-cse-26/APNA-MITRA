@@ -4,9 +4,12 @@ export interface VitalReading {
   id: string;
   type: "bp" | "hr" | "spo2" | "sugar" | "weight";
   value: string;
+  systolic?: number;
+  diastolic?: number;
+  test_type?: string;
   unit: string;
   timestamp: string;
-  status: "normal" | "warning" | "alert";
+  status: string;
   note?: string;
 }
 
@@ -195,6 +198,9 @@ export interface ElderlyProfile {
   passionsLifestyle: string;
   caretakers: CaretakerDetail[];
   isRegistered: boolean;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_relationship?: string;
 }
 
 export interface Appointment {

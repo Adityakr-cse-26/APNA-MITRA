@@ -109,7 +109,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
         specialization: selectedDoctor.specialization || selectedDoctor.speciality,
         date: bookingDate,
         time: bookingTime,
-        status: newAppt.status || 'Confirmed'
+        status: newAppt.status || 'pending'
       });
       setSelectedDoctor(null);
       setBookingDate("");
@@ -218,7 +218,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
   );
 
   return (
-    <section id="nearby-directory" className="py-16 bg-[#F4F7F4] border-t border-[#D8E2DA]">
+    <section id="nearby-directory" className="py-16 bg-[#FAFAFA] border-t border-[#E2E4E0]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
@@ -244,19 +244,19 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search doctor, hospital, chemist..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#D8E2DA] rounded-2xl text-xs font-medium focus:outline-none focus:border-[#1F4E46] shadow-2xs"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E2E4E0] rounded-2xl text-xs font-medium focus:outline-none focus:border-[#1F4E46] shadow-2xs"
             />
           </div>
         </div>
 
         {/* Category Pill Tabs */}
-        <div className="flex bg-white p-1.5 rounded-2xl gap-2 border border-[#D8E2DA] mb-8 shadow-2xs overflow-x-auto text-xs font-bold">
+        <div className="flex bg-white p-1.5 rounded-2xl gap-2 border border-[#E2E4E0] mb-8 shadow-2xs overflow-x-auto text-xs font-bold">
           <button
             onClick={() => setActiveCategory("doctors")}
             className={`flex-1 min-w-[160px] py-2.5 rounded-xl transition flex items-center justify-center gap-2 ${
               activeCategory === "doctors"
                 ? "bg-[#1F4E46] text-white shadow-xs"
-                : "text-[#374940] hover:bg-[#EEF3EA]"
+                : "text-[#374940] hover:bg-[#F3F5F4]"
             }`}
           >
             <UserCheck className="w-4 h-4" />
@@ -268,7 +268,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
             className={`flex-1 min-w-[160px] py-2.5 rounded-xl transition flex items-center justify-center gap-2 ${
               activeCategory === "hospitals"
                 ? "bg-[#1F4E46] text-white shadow-xs"
-                : "text-[#374940] hover:bg-[#EEF3EA]"
+                : "text-[#374940] hover:bg-[#F3F5F4]"
             }`}
           >
             <Hospital className="w-4 h-4" />
@@ -280,7 +280,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
             className={`flex-1 min-w-[160px] py-2.5 rounded-xl transition flex items-center justify-center gap-2 ${
               activeCategory === "pharmacies"
                 ? "bg-[#1F4E46] text-white shadow-xs"
-                : "text-[#374940] hover:bg-[#EEF3EA]"
+                : "text-[#374940] hover:bg-[#F3F5F4]"
             }`}
           >
             <Pill className="w-4 h-4" />
@@ -294,7 +294,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
             {filteredDoctors.map((doc: any) => (
               <div
                 key={doc.id}
-                className="bg-white rounded-3xl p-6 border border-[#D8E2DA] shadow-xs flex flex-col justify-between space-y-4 hover:border-[#1F4E46]/40 transition"
+                className="bg-white rounded-2xl p-6 border border-[#E2E4E0] shadow-xs flex flex-col justify-between space-y-4 hover:border-[#1F4E46]/40 transition"
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
@@ -315,7 +315,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-3 bg-[#F8FAF8] rounded-2xl border border-[#EEF3EA] space-y-1.5 text-xs text-[#2A3D34]">
+                  <div className="p-3 bg-[#F8FAF8] rounded-2xl border border-[#F3F5F4] space-y-1.5 text-xs text-[#2A3D34]">
                     <div className="flex items-center justify-between">
                       <span className="text-stone-500">Clinic / Hospital:</span>
                       <strong className="text-[#153A34]">{doc.hospital || 'Clinic'}</strong>
@@ -339,7 +339,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 pt-2 border-t border-[#EEF3EA]">
+                <div className="flex items-center gap-3 pt-2 border-t border-[#F3F5F4]">
                   <a
                     href={`tel:${doc.phone}`}
                     className="flex-1 py-2.5 bg-[#1F4E46] hover:bg-[#153A34] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition"
@@ -356,7 +356,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                       }
                       setSelectedDoctor(doc);
                     }}
-                    className="px-4 py-2.5 bg-[#EEF3EA] hover:bg-[#DCEAE2] text-[#1F4E46] rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
+                    className="px-4 py-2.5 bg-[#F3F5F4] hover:bg-[#DCEAE2] text-[#1F4E46] rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
                   >
                     <Calendar className="w-4 h-4" />
                     <span>Slot Book</span>
@@ -383,7 +383,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
             {filteredHospitals.map((hosp) => (
               <div
                 key={hosp.id}
-                className="bg-white rounded-3xl p-6 border border-[#D8E2DA] shadow-xs flex flex-col justify-between space-y-4 hover:border-[#1F4E46]/40 transition"
+                className="bg-white rounded-2xl p-6 border border-[#E2E4E0] shadow-xs flex flex-col justify-between space-y-4 hover:border-[#1F4E46]/40 transition"
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -412,7 +412,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-2 border-t border-[#EEF3EA]">
+                <div className="space-y-2 pt-2 border-t border-[#F3F5F4]">
                   <a
                     href={`tel:${hosp.emergencyPhone}`}
                     className="w-full py-2.5 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition shadow-xs"
@@ -450,7 +450,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
             {filteredShops.map((shop) => (
               <div
                 key={shop.id}
-                className="bg-white rounded-3xl p-6 border border-[#D8E2DA] shadow-xs flex flex-col justify-between space-y-4 hover:border-[#1F4E46]/40 transition"
+                className="bg-white rounded-2xl p-6 border border-[#E2E4E0] shadow-xs flex flex-col justify-between space-y-4 hover:border-[#1F4E46]/40 transition"
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -470,7 +470,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-2 border-t border-[#EEF3EA]">
+                <div className="space-y-2 pt-2 border-t border-[#F3F5F4]">
                   <a
                     href={`https://wa.me/${shop.whatsapp}?text=${encodeURIComponent("Hello! I would like to order medicines from Apna Mitra Senior Companion.")}`}
                     target="_blank"
@@ -496,15 +496,15 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
         {/* Booking Form Modal */}
         {selectedDoctor && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-[#D8E2DA] space-y-4 animate-in zoom-in">
-              <div className="flex justify-between items-center border-b border-[#EEF3EA] pb-3 mb-4">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-[#E2E4E0] space-y-4 animate-in zoom-in">
+              <div className="flex justify-between items-center border-b border-[#F3F5F4] pb-3 mb-4">
                 <h3 className="font-serif text-lg font-bold text-[#153A34]">Book Appointment</h3>
                 <button onClick={() => setSelectedDoctor(null)} className="text-stone-400 hover:text-stone-700">
                   <X className="w-5 h-5" />
                 </button>
               </div>
               
-              <div className="bg-[#F8FAF8] p-3 rounded-2xl border border-[#EEF3EA] mb-4">
+              <div className="bg-[#F8FAF8] p-3 rounded-2xl border border-[#F3F5F4] mb-4">
                 <p className="text-sm font-bold text-[#153A34]">{selectedDoctor.name}</p>
                 <p className="text-xs text-stone-500">{selectedDoctor.specialization || selectedDoctor.speciality}</p>
               </div>
@@ -516,7 +516,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                     type="text" 
                     value={user?.user_metadata?.full_name || user?.email || "Patient"} 
                     disabled 
-                    className="w-full bg-stone-50 border border-[#D8E2DA] rounded-xl px-3 py-2 text-xs text-stone-600 font-medium"
+                    className="w-full bg-stone-50 border border-[#E2E4E0] rounded-xl px-3 py-2 text-xs text-stone-600 font-medium"
                   />
                 </div>
                 
@@ -543,7 +543,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                           setBookingDate(val);
                         }
                       }}
-                      className="w-full bg-white border border-[#D8E2DA] focus:border-[#1F4E46] focus:ring-1 focus:ring-[#1F4E46] rounded-xl px-3 py-2 text-xs font-medium outline-none"
+                      className="w-full bg-white border border-[#E2E4E0] focus:border-[#1F4E46] focus:ring-1 focus:ring-[#1F4E46] rounded-xl px-3 py-2 text-xs font-medium outline-none"
                     />
                   </div>
                   <div>
@@ -552,7 +552,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                       required
                       value={bookingTime}
                       onChange={(e) => setBookingTime(e.target.value)}
-                      className="w-full bg-white border border-[#D8E2DA] focus:border-[#1F4E46] focus:ring-1 focus:ring-[#1F4E46] rounded-xl px-3 py-2 text-xs font-medium outline-none"
+                      className="w-full bg-white border border-[#E2E4E0] focus:border-[#1F4E46] focus:ring-1 focus:ring-[#1F4E46] rounded-xl px-3 py-2 text-xs font-medium outline-none"
                     >
                       <option value="">Select time</option>
                       {availableSlots.map(slot => {
@@ -574,7 +574,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                     value={patientReason}
                     onChange={(e) => setPatientReason(e.target.value)}
                     placeholder="Briefly describe the symptoms or reason for visit..."
-                    className="w-full bg-white border border-[#D8E2DA] focus:border-[#1F4E46] focus:ring-1 focus:ring-[#1F4E46] rounded-xl px-3 py-2 text-xs font-medium outline-none resize-none"
+                    className="w-full bg-white border border-[#E2E4E0] focus:border-[#1F4E46] focus:ring-1 focus:ring-[#1F4E46] rounded-xl px-3 py-2 text-xs font-medium outline-none resize-none"
                   ></textarea>
                 </div>
 
@@ -596,7 +596,7 @@ export const NearbyDirectorySection: React.FC<NearbyDirectorySectionProps> = ({
                 {/* Booking feedback modal / toast */}
         {confirmedAppointment && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-[#D8E2DA] space-y-6 animate-in zoom-in">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl border border-[#E2E4E0] space-y-6 animate-in zoom-in">
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
                 <CheckCircle2 className="w-8 h-8" />
               </div>

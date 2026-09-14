@@ -1,0 +1,2 @@
+-- If it doesn't already exist:
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rejection_reason TEXT;

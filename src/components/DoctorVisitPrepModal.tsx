@@ -58,9 +58,9 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
     e.preventDefault();
     setIsLoading(true);
 
-    const bpLatest = vitals.find((v) => v.type === "bp")?.value || "120/80";
-    const hrLatest = vitals.find((v) => v.type === "hr")?.value || "72";
-    const sugarLatest = vitals.find((v) => v.type === "sugar")?.value || "104";
+    const bpLatest = vitals.find((v) => v.type === "bp")?.value || "Not recorded";
+    const hrLatest = vitals.find((v) => v.type === "hr")?.value || "Not recorded";
+    const sugarLatest = vitals.find((v) => v.type === "sugar")?.value || "Not recorded";
 
     try {
       const res = await fetch("/api/doctor-prep", {
@@ -111,10 +111,10 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-[#D8E2DA] my-8 animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-[#E2E4E0] my-8 animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#EEF3EA]">
+        <div className="flex items-center justify-between pb-4 border-b border-[#F3F5F4]">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center justify-center">
               <Calendar className="w-6 h-6" />
@@ -130,19 +130,19 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-[#EEF3EA] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
+            className="w-9 h-9 rounded-full bg-[#F3F5F4] hover:bg-[#DCEAE4] flex items-center justify-center text-[#153A34] font-bold"
           >
             ✕
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 p-1.5 bg-[#F4F7F4] rounded-2xl mt-4 mb-2">
+        <div className="flex gap-2 p-1.5 bg-[#FAFAFA] rounded-2xl mt-4 mb-2">
           <button
             onClick={() => setActiveTab("prep")}
             className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
               activeTab === "prep" 
-                ? "bg-white text-[#1F4E46] shadow-sm border border-[#D8E2DA]" 
+                ? "bg-white text-[#1F4E46] shadow-sm border border-[#E2E4E0]" 
                 : "text-stone-500 hover:text-stone-700 hover:bg-white/50"
             }`}
           >
@@ -153,7 +153,7 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
             onClick={() => setActiveTab("history")}
             className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
               activeTab === "history" 
-                ? "bg-white text-[#1F4E46] shadow-sm border border-[#D8E2DA]" 
+                ? "bg-white text-[#1F4E46] shadow-sm border border-[#E2E4E0]" 
                 : "text-stone-500 hover:text-stone-700 hover:bg-white/50"
             }`}
           >
@@ -173,7 +173,7 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
             ) : (
               <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3">
                 {appointments.map((appt) => (
-                  <div key={appt.id} className="p-4 bg-white border border-[#D8E2DA] rounded-2xl shadow-sm flex flex-col gap-2">
+                  <div key={appt.id} className="p-4 bg-white border border-[#E2E4E0] rounded-2xl shadow-sm flex flex-col gap-2">
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="font-bold text-[#153A34] text-sm">{appt.doctorName}</h4>
@@ -188,12 +188,12 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
                         {appt.status}
                       </span>
                     </div>
-                    <div className="flex flex-wrap gap-3 mt-1 pt-3 border-t border-[#F4F7F4]">
-                      <div className="flex items-center gap-1.5 text-xs text-[#3A4E45] font-medium bg-[#F8FAF8] px-2.5 py-1.5 rounded-lg border border-[#EEF3EA]">
+                    <div className="flex flex-wrap gap-3 mt-1 pt-3 border-t border-[#FAFAFA]">
+                      <div className="flex items-center gap-1.5 text-xs text-[#3A4E45] font-medium bg-[#F8FAF8] px-2.5 py-1.5 rounded-lg border border-[#F3F5F4]">
                         <Calendar className="w-3.5 h-3.5 text-[#1F4E46]" />
                         {appt.date}
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs text-[#3A4E45] font-medium bg-[#F8FAF8] px-2.5 py-1.5 rounded-lg border border-[#EEF3EA]">
+                      <div className="flex items-center gap-1.5 text-xs text-[#3A4E45] font-medium bg-[#F8FAF8] px-2.5 py-1.5 rounded-lg border border-[#F3F5F4]">
                         <Clock className="w-3.5 h-3.5 text-[#1F4E46]" />
                         {appt.time}
                       </div>
@@ -221,7 +221,7 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
                   required
                   value={patientName}
                   onChange={(e) => setPatientName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F4F7F4] border border-[#D8E2DA] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#1F4E46]"
+                  className="w-full px-3.5 py-2.5 bg-[#FAFAFA] border border-[#E2E4E0] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#1F4E46]"
                 />
               </div>
 
@@ -234,7 +234,7 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
                   required
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F4F7F4] border border-[#D8E2DA] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#1F4E46]"
+                  className="w-full px-3.5 py-2.5 bg-[#FAFAFA] border border-[#E2E4E0] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#1F4E46]"
                 />
               </div>
             </div>
@@ -247,7 +247,7 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
                 rows={2}
                 value={chiefComplaints}
                 onChange={(e) => setChiefComplaints(e.target.value)}
-                className="w-full p-3 bg-[#F4F7F4] border border-[#D8E2DA] rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none"
+                className="w-full p-3 bg-[#FAFAFA] border border-[#E2E4E0] rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none"
               />
             </div>
 
@@ -259,11 +259,11 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
                 rows={2}
                 value={coreConcerns}
                 onChange={(e) => setCoreConcerns(e.target.value)}
-                className="w-full p-3 bg-[#F4F7F4] border border-[#D8E2DA] rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none"
+                className="w-full p-3 bg-[#FAFAFA] border border-[#E2E4E0] rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none"
               />
             </div>
 
-            <div className="p-3 bg-[#EEF3EA] rounded-xl text-xs text-[#1F4E46] flex items-center gap-2">
+            <div className="p-3 bg-[#F3F5F4] rounded-xl text-xs text-[#1F4E46] flex items-center gap-2">
               <Activity className="w-4 h-4 shrink-0" />
               <span>
                 Includes your logged vitals and {medications.length} active medications automatically.
@@ -291,8 +291,8 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
         ) : (
           /* Ready Summary Sheet View */
           <div className="pt-4 space-y-4">
-            <div className="p-5 bg-[#F4F7F4] rounded-2xl border border-[#D8E2DA] text-[#22312B] space-y-4 print:border-none print:p-0">
-              <div className="border-b border-[#D8E2DA] pb-3 flex justify-between items-start">
+            <div className="p-5 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0] text-[#22312B] space-y-4 print:border-none print:p-0">
+              <div className="border-b border-[#E2E4E0] pb-3 flex justify-between items-start">
                 <div>
                   <h4 className="font-serif text-lg font-bold text-[#153A34]">
                     {prepData.summaryTitle}
@@ -311,7 +311,7 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
                 <span className="text-xs font-bold text-[#35483F] uppercase tracking-wider block mb-1">
                   🩺 Vitals Snapshot
                 </span>
-                <p className="text-xs font-mono font-medium text-[#153A34] bg-white p-2.5 rounded-xl border border-[#D8E2DA]">
+                <p className="text-xs font-mono font-medium text-[#153A34] bg-white p-2.5 rounded-xl border border-[#E2E4E0]">
                   {prepData.keyVitalsSnapshot}
                 </p>
               </div>
@@ -321,7 +321,7 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
                 <span className="text-xs font-bold text-[#35483F] uppercase tracking-wider block mb-1">
                   📝 Symptoms &amp; Reason for Visit
                 </span>
-                <ul className="text-xs text-[#3A4E45] space-y-1 pl-4 list-disc bg-white p-3 rounded-xl border border-[#D8E2DA]">
+                <ul className="text-xs text-[#3A4E45] space-y-1 pl-4 list-disc bg-white p-3 rounded-xl border border-[#E2E4E0]">
                   {prepData.chiefComplaints?.map((c, i) => (
                     <li key={i}>{c}</li>
                   ))}
@@ -333,9 +333,9 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
                 <span className="text-xs font-bold text-[#35483F] uppercase tracking-wider block mb-1">
                   💊 Current Active Medications
                 </span>
-                <div className="bg-white p-3 rounded-xl border border-[#D8E2DA] flex flex-wrap gap-2 text-xs">
+                <div className="bg-white p-3 rounded-xl border border-[#E2E4E0] flex flex-wrap gap-2 text-xs">
                   {prepData.medicationsList?.map((m, i) => (
-                    <span key={i} className="px-2.5 py-1 bg-[#EEF3EA] text-[#1F4E46] rounded-lg font-medium">
+                    <span key={i} className="px-2.5 py-1 bg-[#F3F5F4] text-[#1F4E46] rounded-lg font-medium">
                       {m}
                     </span>
                   ))}
@@ -361,7 +361,7 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-[#4A5D54]">
                   {prepData.checklist?.map((item, i) => (
-                    <div key={i} className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-[#D8E2DA]">
+                    <div key={i} className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-[#E2E4E0]">
                       <CheckCircle2 className="w-3.5 h-3.5 text-[#1F4E46] shrink-0" />
                       <span>{item}</span>
                     </div>
@@ -383,7 +383,7 @@ export const DoctorVisitPrepModal: React.FC<DoctorVisitPrepModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPrepData(null)}
-                className="px-4 py-3 bg-[#EEF3EA] text-[#1F4E46] font-semibold text-sm rounded-xl hover:bg-[#DCEAE4] flex items-center gap-1.5"
+                className="px-4 py-3 bg-[#F3F5F4] text-[#1F4E46] font-semibold text-sm rounded-xl hover:bg-[#DCEAE4] flex items-center gap-1.5"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Edit</span>

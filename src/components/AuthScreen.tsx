@@ -15,7 +15,7 @@ interface AuthScreenProps {
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, onGuestLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
-  const [authMode, setAuthMode] = useState<'patient' | 'admin'>('patient');
+  const [authMode, setAuthMode] = useState<'patient' | 'admin' | 'caretaker'>('patient');
   const [isReset, setIsReset] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   
@@ -45,7 +45,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<string | null>('Testing connection...');
+  
 
   const fieldRefs = {
     fullName: useRef<HTMLInputElement>(null),
@@ -72,17 +72,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
   useEffect(() => {
     const testConnection = async () => {
       if (!hasSupabaseConfig) {
-        setConnectionStatus('Supabase credentials missing. Please check AI Studio Settings.');
+        
         return;
       }
       try {
         const { error } = await supabase.auth.getSession();
         if (error) throw error;
-        setConnectionStatus('Supabase connected successfully');
-        setTimeout(() => setConnectionStatus(null), 5000);
+        
+        
       } catch (err) {
         console.error("Supabase connection error:", err);
-        setConnectionStatus('Failed to connect to Supabase');
+        
       }
     };
     testConnection();
@@ -452,24 +452,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F7F4] flex flex-col justify-center items-center p-4">
-      {connectionStatus && (
-        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg font-semibold text-sm transition-opacity duration-300 ${
-          connectionStatus.includes('successfully') ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 
-          connectionStatus.includes('Failed') ? 'bg-rose-100 text-rose-800 border border-rose-300' :
-          'bg-blue-100 text-blue-800 border border-blue-300'
-        }`}>
-          {connectionStatus}
-        </div>
-      )}
+    <div className="min-h-screen bg-[#FAFAFA] flex flex-col justify-center items-center p-4">
+      
 
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-[#D8E2DA] my-8">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-[#E2E4E0] my-8">
         <div className="bg-emerald-800 p-8 text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-20">
             <HeartPulse className="w-32 h-32 text-emerald-200" />
           </div>
           <div className="relative z-10 flex flex-col items-center">
-            <ApnaMitraLogo className="w-16 h-16 text-white mb-4" />
+            <div className="bg-white p-3 rounded-2xl mb-4 shadow-md inline-flex items-center justify-center">
+              <ApnaMitraLogo size="xl" variant="full" showTagline={false} />
+            </div>
             <h1 className="text-3xl font-extrabold text-white mb-2">{currentLang === 'hi' ? 'अपना मित्र' : currentLang === 'bn' ? 'আপন মিত্র' : 'Apna Mitra'}</h1>
             <p className="text-emerald-100 font-medium">{currentLang === 'hi' ? 'आपका स्वास्थ्य और गार्जियन डैशबोर्ड' : currentLang === 'bn' ? 'আপনার স্বাস্থ্য এবং অভিভাবক ড্যাশবোর্ড' : 'Your Health & Guardian Dashboard'}</p>
           </div>
@@ -504,21 +498,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
             </div>
           )}
 
-          {error && onGuestLogin && (
-            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl">
-              <p className="text-sm mb-3">
-                <strong>Testing Options</strong><br />
-                Click below to bypass authentication and test the app using a Demo account.
-              </p>
-              <button
-                type="button"
-                onClick={onGuestLogin}
-                className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold transition shadow-sm"
-              >
-                Skip Login & Use Demo Account
-              </button>
-            </div>
-          )}
+          
           
           <form onSubmit={isReset ? handleResetPassword : handleSubmit} className="space-y-1" noValidate>
             

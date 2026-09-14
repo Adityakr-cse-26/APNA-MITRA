@@ -21,7 +21,7 @@ export const TrustPrivacySection: React.FC<TrustPrivacySectionProps> = ({
   const t = translations[currentLang];
 
   return (
-    <section id="privacy" className="py-16 md:py-24 bg-white border-b border-[#D8E2DA]">
+    <section id="privacy" className="py-16 md:py-24 bg-white border-b border-[#E2E4E0]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Heading */}
@@ -40,7 +40,7 @@ export const TrustPrivacySection: React.FC<TrustPrivacySectionProps> = ({
         {/* 3 Privacy Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16">
           
-          <article className="bg-[#F4F7F4] rounded-3xl p-7 border border-[#D8E2DA] shadow-xs flex flex-col justify-between">
+          <article className="bg-[#FAFAFA] rounded-2xl p-7 border border-[#E2E4E0] shadow-xs flex flex-col justify-between">
             <div className="space-y-3.5">
               <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-xl shadow-xs">
                 🔐
@@ -52,13 +52,13 @@ export const TrustPrivacySection: React.FC<TrustPrivacySectionProps> = ({
                 We implement local-first privacy principles, encrypted storage, and granular access controls for all personal health measurements and report logs.
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t border-[#D8E2DA] text-xs font-semibold text-[#1F4E46] flex items-center gap-1.5">
+            <div className="mt-6 pt-4 border-t border-[#E2E4E0] text-xs font-semibold text-[#1F4E46] flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4" />
               <span>Protected Health Data</span>
             </div>
           </article>
 
-          <article className="bg-[#F4F7F4] rounded-3xl p-7 border border-[#D8E2DA] shadow-xs flex flex-col justify-between">
+          <article className="bg-[#FAFAFA] rounded-2xl p-7 border border-[#E2E4E0] shadow-xs flex flex-col justify-between">
             <div className="space-y-3.5">
               <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-xl shadow-xs">
                 👤
@@ -70,13 +70,13 @@ export const TrustPrivacySection: React.FC<TrustPrivacySectionProps> = ({
                 You decide who sees your readings. Share vitals or doctor prep sheets with designated family caregivers or doctors only when you explicitly choose.
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t border-[#D8E2DA] text-xs font-semibold text-[#1F4E46] flex items-center gap-1.5">
+            <div className="mt-6 pt-4 border-t border-[#E2E4E0] text-xs font-semibold text-[#1F4E46] flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4" />
               <span>Consent-Driven Sharing</span>
             </div>
           </article>
 
-          <article className="bg-[#F4F7F4] rounded-3xl p-7 border border-[#D8E2DA] shadow-xs flex flex-col justify-between">
+          <article className="bg-[#FAFAFA] rounded-2xl p-7 border border-[#E2E4E0] shadow-xs flex flex-col justify-between">
             <div className="space-y-3.5">
               <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-xl shadow-xs">
                 🧠
@@ -88,7 +88,7 @@ export const TrustPrivacySection: React.FC<TrustPrivacySectionProps> = ({
                 Mitra AI follows strict clinical safety boundaries: it avoids definitive unverified diagnoses, prevents unsafe prescription modifications, and guides you to professional care.
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t border-[#D8E2DA] text-xs font-semibold text-[#1F4E46] flex items-center gap-1.5">
+            <div className="mt-6 pt-4 border-t border-[#E2E4E0] text-xs font-semibold text-[#1F4E46] flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4" />
               <span>Medically Responsible AI</span>
             </div>
@@ -97,7 +97,7 @@ export const TrustPrivacySection: React.FC<TrustPrivacySectionProps> = ({
         </div>
 
         {/* Big CTA Box */}
-        <div className="bg-gradient-to-br from-[#1F4E46] to-[#153A34] text-white rounded-3xl p-8 sm:p-12 text-center shadow-2xl relative overflow-hidden">
+        <div className="bg-gradient-to-br from-[#1F4E46] to-[#153A34] text-white rounded-2xl p-8 sm:p-12 text-center shadow-2xl relative overflow-hidden">
           <div className="max-w-2xl mx-auto space-y-4">
             <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
               Meet your new health companion.

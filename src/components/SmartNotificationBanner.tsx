@@ -57,7 +57,7 @@ export const SmartNotificationBanner: React.FC<SmartNotificationBannerProps> = (
             <button
               type="button"
               onClick={onOpenAlertsSection}
-              className="px-3 py-1.5 bg-white text-[#153A34] hover:bg-[#EEF3EA] rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-xs"
+              className="px-3 py-1.5 bg-white text-[#153A34] hover:bg-[#F3F5F4] rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-xs"
             >
               <span>View Guidance</span>
               <ChevronRight className="w-3.5 h-3.5" />

@@ -4,14 +4,17 @@ import { User } from '@supabase/supabase-js';
 import { Building2, User as UserIcon, Calendar, Activity, Search, AlertOctagon, LogOut, Loader2, Sparkles, AlertCircle, Check, Bell, MapPin, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 import { Language } from "../types";
+import { getCurrentLocation } from "../utils/geolocation";
 interface PatientDashboardProps {
   currentLang: Language;
   user: User;
   onLogout: () => void;
   onOpenSymptomChecker: () => void;
+  onOpenMedicineReminder: () => void;
+  onOpenProfile?: () => void;
 }
 
-export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, onLogout, onOpenSymptomChecker, currentLang }) => {
+export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, onLogout, onOpenSymptomChecker, onOpenMedicineReminder, currentLang, onOpenProfile }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -19,6 +22,17 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
   const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
   const [previousAppointments, setPreviousAppointments] = useState<any[]>([]);
   const [healthChecks, setHealthChecks] = useState<any[]>([]);
+  const [primaryCaretaker, setPrimaryCaretaker] = useState<any>(null);
+
+  const [hasPushSub, setHasPushSub] = useState(false);
+  useEffect(() => {
+    if (user?.id) {
+      supabase.from('push_subscriptions').select('id').eq('patient_uid', user.id).then(({ data }) => {
+        setHasPushSub(data && data.length > 0);
+      });
+    }
+  }, [user]);
+
 
   const [notifications, setNotifications] = useState<any[]>([]);
 
@@ -78,6 +92,26 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
         
       if (profileError) throw profileError;
       setProfile(profileData || { full_name: user.user_metadata?.full_name || 'Patient' });
+
+      // Fetch Primary Caretaker
+      const { data: caretakersData } = await supabase
+        .from('caretakers')
+        .select('*')
+        .eq('patient_id', user.id)
+        .order('created_at', { ascending: true }) // First created caretaker
+        .limit(1);
+      
+      if (caretakersData && caretakersData.length > 0) {
+        setPrimaryCaretaker(caretakersData.find((c: any) => c.is_primary) || caretakersData[0]);
+      } else {
+        // Fallback to profile's emergency contact if no caretaker is in the caretakers table
+        if (profileData && profileData.emergency_contact_name && profileData.emergency_contact_phone) {
+           setPrimaryCaretaker({
+             name: profileData.emergency_contact_name,
+             phone: profileData.emergency_contact_phone
+           });
+        }
+      }
       
       // Fetch Notifications
       const { data: notifData, error: notifError } = await supabase
@@ -127,6 +161,10 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
 
   const handleSOS = () => {
     console.log("SOS button clicked");
+    if (!primaryCaretaker || !primaryCaretaker.name || !primaryCaretaker.phone) {
+      alert("Please add an emergency contact before using SOS.");
+      return;
+    }
     setShowSosConfirm(true);
     setSosStatus('idle');
     setSosMessage('');
@@ -135,91 +173,86 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
   const confirmSOS = async () => {
     setSosStatus('loading');
     
-    console.log("User found:", user.id);
-    console.log("Profile found:", profile?.full_name, profile?.guardian_name, profile?.guardian_phone);
-
-    if (!navigator.geolocation) {
+    if (!primaryCaretaker || !primaryCaretaker.name || !primaryCaretaker.phone) {
       setSosStatus('error');
-      setSosMessage("Geolocation is not supported by your browser.");
+      setSosMessage("Please add an emergency contact before using SOS.");
       return;
     }
+    
+    console.log("User found:", user.id);
+    import("../utils/audio").then((m) => {
+        if (m.playSiren) m.playSiren();
+    }).catch(() => {});
 
-    import("../utils/audio").then((m) => m.playSiren());
+    // Try to get location
+    let loc = null;
+    try {
+      loc = await getCurrentLocation();
+    } catch(e) {
+      console.warn("Could not get location", e);
+    }
+    
+    try {
+      const { data: alertData, error: insertError } = await supabase.from('emergency_alerts').insert([{
+        patient_id: user.id,
+        emergency_contact_name: primaryCaretaker.name,
+        emergency_contact_phone: primaryCaretaker.phone,
+        emergency_contact_relationship: primaryCaretaker.relation || primaryCaretaker.relationship || 'Primary Contact',
+        alert_type: "SOS",
+        status: "created",
+        notification_status: "pending",
+        location_lat: loc ? loc.latitude : null,
+        location_lng: loc ? loc.longitude : null,
+        location_accuracy: loc ? loc.accuracy : null,
+        location_timestamp: loc ? loc.timestamp : null
+      }]).select('id').single();
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        console.log("Location obtained:", position.coords.latitude, position.coords.longitude);
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-
-        try {
-          const { error: insertError } = await supabase.from('sos_alerts').insert([{
-            patient_id: user.id,
-            patient_name: profile?.full_name || 'Patient',
-            caretaker_name: profile?.guardian_name || '',
-            caretaker_phone: profile?.guardian_phone || '',
-            latitude: latitude,
-            longitude: longitude,
-            message: "Emergency SOS Alert",
-            status: "active"
-          }]);
-
-          if (insertError) {
-            console.error("SOS Insert Error:", insertError);
-            setSosStatus('error');
-            if (insertError.code === '42501' || insertError.message?.includes('row-level security')) {
-              setSosMessage("Database Error: Row-Level Security (RLS) is blocking the insertion. Please run the provided SQL in your Supabase SQL Editor to allow patients to insert SOS alerts.");
-            } else {
-              setSosMessage("Failed to create SOS Alert. Please try again or call emergency services directly.");
-            }
-          } else {
-            console.log("SOS record inserted");
-
-            // 2 & 3. Get profile and guardian_id (from state)
-            const guardianId = profile?.guardian_id;
-
-            // 4 & 5. Create a row in the existing "notifications" table
-            const { error: notifError } = await supabase.from('notifications').insert([{
-              patient_id: user.id,
-              patient_name: profile?.full_name || 'Patient',
-              title: "🚨 Emergency SOS Alert",
-              message: "Emergency SOS Alert",
-              location: `${latitude}, ${longitude}`,
-              type: "SOS",
-              is_read: false
-            }]);
-
-            if (notifError) {
-              console.error("Failed to insert notification:", notifError);
-              setSosStatus('error');
-              if (notifError.code === '42501' || notifError.message?.includes('row-level security')) {
-                 setSosMessage("Database Error: Row-Level Security (RLS) is blocking the notification insertion. Please run 'fix_notifications_rls.sql' in your Supabase SQL Editor.");
-              } else {
-                 setSosMessage("Failed to insert notification. Please check database permissions.");
-              }
-              return;
-            } else {
-              console.log("Notification record inserted");
-            }
-
-            setSosStatus('success');
-            setSosMessage("🚨 SOS Alert Created Successfully");
-            setTimeout(() => {
-                setShowSosConfirm(false);
-                setSosStatus('idle');
-            }, 3000);
-          }
-        } catch (err) {
-          console.error("SOS catch error:", err);
-          setSosStatus('error');
-          setSosMessage("An error occurred while creating the SOS alert.");
-        }
-      },
-      (error) => {
+      if (insertError) {
+        console.error("SOS Insert Error:", insertError);
         setSosStatus('error');
-        setSosMessage("Location permission is required to send your emergency location.");
-      }
-    );
+        setSosMessage("Unable to create SOS alert. Please try again.");
+      } else {
+        console.log("SOS record inserted, invoking edge function...");
+        
+        // Also insert a notification to maintain the bell icon history
+        await supabase.from('notifications').insert([{
+          patient_id: user.id,
+          patient_name: profile?.full_name || 'Patient',
+          title: "🚨 Emergency SOS Alert",
+          message: "Emergency SOS Alert",
+          type: "SOS",
+          is_read: false
+        }]);
+
+        // Invoke Edge Function
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('send-sos-sms', {
+          body: { alert_id: alertData.id }
+        });
+
+        if (edgeError || (edgeData && edgeData.error)) {
+           const errMsg = edgeError?.message || edgeData?.error || "Failed to send notification";
+           console.error("SMS Edge Function Error:", errMsg);
+           setSosStatus('error');
+           
+           if (typeof errMsg === "string" && (errMsg.includes("No caretaker push subscriptions found") || errMsg.includes("Caretaker has not enabled emergency notifications"))) {
+              setSosMessage("Emergency notifications are disabled on the caretaker's phone. Please call your emergency contact directly: " + (primaryCaretaker?.phone || ''));
+           } else {
+              setSosMessage("We couldn't send the emergency notification. Please call your emergency contact directly.");
+           }
+           return;
+        }
+
+        setSosStatus('success');
+        setSosMessage(loc ? "📍 Location shared with Primary Caretaker (Check Guardian app)" : "⚠️ SOS sent, but location was unavailable.");
+        setTimeout(() => {
+            setShowSosConfirm(false);
+            setSosStatus('idle');
+        }, 3000);      }
+    } catch (err) {
+      console.error("SOS catch error:", err);
+      setSosStatus('error');
+      setSosMessage("Emergency notification could not be completed. Please try again.");
+    }
   };
 
   if (loading) {
@@ -232,7 +265,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-8">
+    <div id="home" className="w-full max-w-7xl mx-auto px-4 py-8">
       {error && (
         <div className="mb-6 bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-3 text-rose-700">
           <AlertCircle className="w-6 h-6 shrink-0" />
@@ -270,7 +303,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
         {/* Left Column */}
         <div className="lg:col-span-1 space-y-6">
           {/* Profile Card */}
-          <div className="bg-white rounded-3xl p-6 shadow-lg shadow-emerald-900/5 border border-emerald-100 relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-emerald-900/10 hover:-translate-y-1 group">
+          <div className="bg-white rounded-2xl p-6 shadow-lg shadow-emerald-900/5 border border-emerald-100 relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-emerald-900/10 hover:-translate-y-1 group">
             <div className="absolute top-0 right-0 p-4 opacity-5 transition-opacity duration-300 group-hover:opacity-10 transform translate-x-4 -translate-y-4">
               <UserIcon className="w-32 h-32 text-emerald-800" />
             </div>
@@ -280,7 +313,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
                 <UserIcon className="w-7 h-7" />
               </div>
               <h2 className="text-xl font-extrabold text-[#153A34] mb-1 tracking-tight">{currentLang === 'hi' ? 'रोगी प्रोफ़ाइल' : currentLang === 'bn' ? 'রোগীর প্রোফাইল' : 'Patient Profile'}</h2>
-              <p className="text-sm text-emerald-600/80 font-medium mb-5">{currentLang === 'hi' ? 'अपना व्यक्तिगत स्वास्थ्य डेटा प्रबंधित करें' : currentLang === 'bn' ? 'আপনার ব্যক্তিগত স্বাস্থ্য ডেটা পরিচালনা করুন' : 'Manage your personal health data'}</p>
+              <p onClick={onOpenProfile} className="text-sm text-emerald-600/80 font-medium mb-5 cursor-pointer hover:text-emerald-700 hover:underline flex items-center gap-1">{currentLang === 'hi' ? 'अपना व्यक्तिगत स्वास्थ्य डेटा प्रबंधित करें' : currentLang === 'bn' ? 'আপনার ব্যক্তিগত স্বাস্থ্য ডেটা পরিচালনা করুন' : 'Manage your personal health data'} <span>→</span></p>
               <div className="space-y-3 mb-6 bg-stone-50/50 rounded-2xl p-4 border border-stone-100">
                 <div className="flex justify-between items-center py-2 border-b border-gray-50">
                   <span className="text-gray-500 text-sm">{currentLang === 'hi' ? 'भूमिका' : currentLang === 'bn' ? 'ভূমিকা' : 'Role'}</span>
@@ -307,7 +340,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-emerald-900 to-[#0F2925] rounded-3xl p-6 shadow-xl shadow-emerald-900/10 text-white relative overflow-hidden group">
+          <div className="bg-gradient-to-br from-emerald-900 to-[#0F2925] rounded-2xl p-6 shadow-xl shadow-emerald-900/10 text-white relative overflow-hidden group">
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500 rounded-full blur-[64px] opacity-20 transform translate-x-1/2 -translate-y-1/2 group-hover:opacity-40 transition-opacity duration-700"></div>
             
@@ -317,7 +350,24 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
             </h3>
             
             <div className="space-y-3 relative z-10">
+              
               <button 
+                className="w-full flex items-center justify-between bg-white/5 hover:bg-white/15 border border-white/5 hover:border-emerald-400/30 px-5 py-4 rounded-2xl transition-all duration-300 text-left group/btn hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-900/20"
+                onClick={onOpenMedicineReminder}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-300 group-hover/btn:bg-emerald-400 group-hover/btn:text-[#0F2925] transition-colors duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pill"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+                  </div>
+                  <div>
+                    <span className="block font-bold text-emerald-50 mb-0.5">{currentLang === 'hi' ? 'दवा ट्रैकर' : currentLang === 'bn' ? 'ঔষধ ট্র্যাকার' : 'Medication Tracker'}</span>
+                    <span className="block text-xs text-emerald-200/60 font-medium">{currentLang === 'hi' ? 'अपनी दवाएं देखें' : currentLang === 'bn' ? 'আপনার ঔষধ দেখুন' : 'View your daily medicines'}</span>
+                  </div>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-emerald-400/50 group-hover/btn:text-emerald-300 transition-colors lucide lucide-activity"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </button>
+
+<button 
                 onClick={onOpenSymptomChecker}
                 className="w-full flex items-center justify-between bg-white/5 hover:bg-white/15 border border-white/5 hover:border-emerald-400/30 px-5 py-4 rounded-2xl transition-all duration-300 text-left group/btn hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-900/20"
               >
@@ -379,7 +429,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
         <div className="lg:col-span-2 space-y-6">
           
           {/* Upcoming Appointments */}
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-emerald-100/50 hover:shadow-lg hover:shadow-emerald-900/5 transition-all duration-300">
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-emerald-100/50 hover:shadow-lg hover:shadow-emerald-900/5 transition-all duration-300">
             <div className="flex items-center gap-4 mb-6">
               <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
                 <Calendar className="w-6 h-6" />
@@ -414,16 +464,20 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-bold text-[#153A34] text-lg leading-none">{appt.doctor_name || currentLang === 'hi' ? 'डॉक्टर अपॉइंटमेंट' : currentLang === 'bn' ? 'ডাক্তার অ্যাপয়েন্টমেন্ট' : 'Doctor Appointment'}</h4>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            appt.status?.toLowerCase() === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
-                            appt.status?.toLowerCase() === 'cancelled' ? 'bg-rose-100 text-rose-700' :
-                            'bg-amber-100 text-amber-700'
-                          }`}>
-                            {appt.status || 'Pending'}
-                          </span>
+                          <h4 className="font-bold text-[#153A34] text-lg leading-none">{appt.doctor_name || (currentLang === 'hi' ? 'डॉक्टर अपॉइंटमेंट' : currentLang === 'bn' ? 'ডাক্তার অ্যাপয়েন্টমেন্ট' : 'Doctor Appointment')}</h4>
+                          {
+    (() => {
+      const st = (appt.status || 'pending').toLowerCase();
+      if (st === 'pending') return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">⏳ Waiting for Admin Confirmation</span>;
+      if (st === 'confirmed') return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">✅ Appointment Confirmed</span>;
+      if (st === 'rejected') return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">❌ Appointment Rejected</span>;
+      if (st === 'cancelled') return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">Cancelled</span>;
+      if (st === 'completed') return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Completed</span>;
+      return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{st}</span>;
+    })()
+  }
                         </div>
-                        <p className="text-sm text-emerald-600/80 font-medium leading-snug">{appt.hospital || currentLang === 'hi' ? 'क्लिनिक' : currentLang === 'bn' ? 'ক্লিনিক' : 'Clinic'}</p>
+                        <p className="text-sm text-emerald-600/80 font-medium leading-snug">{appt.hospital || (currentLang === 'hi' ? 'क्लिनिक' : currentLang === 'bn' ? 'ক্লিনিক' : 'Clinic')}</p>
                         {appt.reason && <p className="text-sm text-stone-500 mt-1.5 flex items-center gap-1.5 leading-snug"><Activity className="w-3.5 h-3.5 text-stone-400" /> {appt.reason}</p>}
                         <p className="text-xs text-stone-400 mt-1">{currentLang === 'hi' ? 'आईडी:' : currentLang === 'bn' ? 'আইডি:' : 'ID:'} {appt.id?.slice(0, 8).toUpperCase()}</p>
                       </div>
@@ -439,7 +493,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+             <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100">
                <h3 className="font-bold text-[#153A34] mb-4 flex items-center gap-2"><Calendar className="w-5 h-5 text-emerald-600" />{currentLang === 'hi' ? 'पिछले अपॉइंटमेंट' : currentLang === 'bn' ? 'আগের অ্যাপয়েন্টমেন্ট' : 'Previous Appointments'}</h3>
                {previousAppointments.length === 0 ? (
                  <p className="text-stone-500 text-sm">{currentLang === 'hi' ? 'कोई पिछला अपॉइंटमेंट नहीं मिला।' : currentLang === 'bn' ? 'আগের কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি।' : 'No previous appointments found.'}</p>
@@ -447,15 +501,15 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
                  <div className="space-y-3">
                    {previousAppointments.map((appt: any) => (
                      <div key={appt.id} className="p-3 bg-stone-50 rounded-xl border border-stone-100">
-                       <p className="font-bold text-[#153A34] text-sm">{appt.doctor_name || currentLang === 'hi' ? 'डॉक्टर अपॉइंटमेंट' : currentLang === 'bn' ? 'ডাক্তার অ্যাপয়েন্টমেন্ট' : 'Doctor Appointment'}</p>
-                       <p className="text-xs text-stone-500">{new Date(appt.appointment_date).toLocaleDateString()} • {appt.status || currentLang === 'hi' ? 'पूरा हुआ' : currentLang === 'bn' ? 'সম্পন্ন' : 'Completed'}</p>
+                       <p className="font-bold text-[#153A34] text-sm">{appt.doctor_name || (currentLang === 'hi' ? 'डॉक्टर अपॉइंटमेंट' : currentLang === 'bn' ? 'ডাক্তার অ্যাপয়েন্টমেন্ট' : 'Doctor Appointment')}</p>
+                       <p className="text-xs text-stone-500">{new Date(appt.appointment_date).toLocaleDateString()} • {appt.status || (currentLang === 'hi' ? 'पूरा हुआ' : currentLang === 'bn' ? 'সম্পন্ন' : 'Completed')}</p>
                      </div>
                    ))}
                  </div>
                )}
              </div>
              
-             <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+             <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100">
                <h3 className="font-bold text-[#153A34] mb-4 flex items-center gap-2"><Activity className="w-5 h-5 text-emerald-600" />{currentLang === 'hi' ? 'स्वास्थ्य इतिहास और जांच' : currentLang === 'bn' ? 'স্বাস্থ্য ইতিহাস এবং চেক' : 'Health History & Checks'}</h3>
                {healthChecks.length === 0 ? (
                  <p className="text-stone-500 text-sm">{currentLang === 'hi' ? 'अभी तक कोई स्वास्थ्य जांच दर्ज नहीं की गई है।' : currentLang === 'bn' ? 'এখনও কোন স্বাস্থ্য পরীক্ষা রেকর্ড করা হয়নি।' : 'No health checks recorded yet.'}</p>
@@ -463,14 +517,14 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
                  <div className="space-y-3">
                    {healthChecks.map((check: any) => (
                      <div key={check.id} className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                       <p className="font-bold text-[#153A34] text-sm line-clamp-2">{check.symptoms || check.summary || currentLang === 'hi' ? 'सामान्य मूल्यांकन' : currentLang === 'bn' ? 'সাধারণ মূল্যায়ন' : 'General Assessment'}</p>
+                       <p className="font-bold text-[#153A34] text-sm line-clamp-2">{check.symptoms || check.summary || (currentLang === 'hi' ? 'सामान्य मूल्यांकन' : currentLang === 'bn' ? 'সাধারণ মূল্যায়ন' : 'General Assessment')}</p>
                        <div className="mt-2 flex justify-between items-center">
                          <span className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded-full ${
                            check.triage_level?.toLowerCase().includes('emergency') ? 'bg-rose-100 text-rose-700' :
                            check.triage_level?.toLowerCase().includes('doctor') ? 'bg-amber-100 text-amber-700' :
                            'bg-emerald-100 text-emerald-700'
                          }`}>
-                           {check.triage_level || currentLang === 'hi' ? 'सामान्य' : currentLang === 'bn' ? 'সাধারণ' : 'General'}
+                           {check.triage_level || (currentLang === 'hi' ? 'सामान्य' : currentLang === 'bn' ? 'সাধারণ' : 'General')}
                          </span>
                          <span className="text-xs text-emerald-600 font-medium">
                            {new Date(check.created_at || Date.now()).toLocaleDateString()}
@@ -498,7 +552,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
         </div>
         
         {notifications.length === 0 ? (
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-emerald-100 text-center">
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-emerald-100 text-center">
             <p className="text-emerald-700 font-medium">
               {currentLang === 'hi' ? 'कोई आपातकालीन सूचना नहीं है।' : currentLang === 'bn' ? 'কোনো জরুরি বিজ্ঞপ্তি নেই।' : 'No emergency notifications at this time.'}
             </p>
@@ -508,7 +562,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
             {notifications.map((notif: any) => (
               <div 
                 key={notif.id} 
-                className={`relative bg-white rounded-3xl p-6 shadow-lg border-2 transition-all ${notif.is_read ? 'border-gray-200 shadow-gray-200/50 opacity-75' : 'border-rose-500 shadow-rose-200'}`}
+                className={`relative bg-white rounded-2xl p-6 shadow-lg border-2 transition-all ${notif.is_read ? 'border-gray-200 shadow-gray-200/50 opacity-75' : 'border-rose-500 shadow-rose-200'}`}
               >
                 {!notif.is_read && (
                   <span className="absolute -top-3 -right-3 flex h-6 w-6">
@@ -571,7 +625,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
       {/* SOS Custom Modal */}
       {showSosConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative">
+          <div className="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full shadow-2xl relative">
             <h3 className="text-2xl font-bold text-rose-600 mb-2 flex items-center gap-2">
               <AlertOctagon className="w-8 h-8" />
               Emergency SOS
@@ -579,9 +633,26 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
             
             {sosStatus === 'idle' && (
               <>
-                <p className="text-gray-700 font-medium mb-6 text-lg">
-                  Are you sure you want to send an emergency SOS?
+                <p className="text-gray-700 font-medium mb-4 text-lg">
+                  Are you sure you want to send an emergency alert to your primary emergency contact?
                 </p>
+                <div className="bg-rose-50 border border-rose-100 text-rose-700 p-3 rounded-lg mb-6 text-sm flex items-start gap-2">
+                  <span className="mt-0.5">📍</span>
+                  <p>Your current GPS location will be captured and shared securely with your guardian to assist you.</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-xl mb-6 border border-gray-200">
+                  <p className="text-sm text-gray-500 font-semibold uppercase tracking-wider mb-1">Contact:</p>
+                  
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-2 h-2 rounded-full ${hasPushSub ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-xs font-medium text-gray-600">
+                    {hasPushSub ? '🟢 Emergency notifications enabled' : '🔴 Emergency notifications disabled'}
+                  </span>
+                </div>
+
+<p className="font-bold text-gray-900 text-lg">{primaryCaretaker?.name}</p>
+                  <p className="font-bold text-rose-600 text-lg">{primaryCaretaker?.phone}</p>
+                </div>
                 <div className="flex justify-end gap-3">
                   <button 
                     onClick={() => setShowSosConfirm(false)}
@@ -593,35 +664,39 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
                     onClick={confirmSOS}
                     className="px-5 py-3 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-200 transition-transform transform hover:scale-105 active:scale-95"
                   >
-                    Confirm
+                    Send SOS
                   </button>
                 </div>
               </>
             )}
 
             {sosStatus === 'loading' && (
-              <div className="flex flex-col items-center justify-center py-6">
-                <Loader2 className="w-12 h-12 text-rose-600 animate-spin mb-4" />
-                <p className="text-rose-800 font-bold text-lg">Sending Emergency Alert...</p>
+              <div className="py-8 flex flex-col items-center justify-center text-center">
+                <Loader2 className="w-12 h-12 text-rose-500 animate-spin mb-4" />
+                <p className="text-lg font-bold text-gray-700">Creating SOS Alert...</p>
               </div>
             )}
 
             {sosStatus === 'success' && (
-              <div className="flex flex-col items-center justify-center py-6">
-                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
-                  <Check className="w-8 h-8 text-emerald-600" />
+              <div className="py-6 text-center animate-in fade-in zoom-in duration-300">
+                <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check className="w-10 h-10" />
                 </div>
-                <p className="text-emerald-700 font-bold text-lg text-center">{sosMessage}</p>
+                <h4 className="text-2xl font-bold text-gray-800 mb-2">Success</h4>
+                <p className="text-emerald-700 font-medium text-lg whitespace-pre-line">{sosMessage}</p>
               </div>
             )}
 
             {sosStatus === 'error' && (
-              <div className="flex flex-col items-center justify-center py-4">
-                <AlertCircle className="w-12 h-12 text-rose-500 mb-3" />
-                <p className="text-rose-700 font-bold text-center mb-6">{sosMessage}</p>
+              <div className="py-6 text-center animate-in fade-in zoom-in duration-300">
+                <div className="w-20 h-20 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-10 h-10" />
+                </div>
+                <h4 className="text-2xl font-bold text-gray-800 mb-2">Error</h4>
+                <p className="text-rose-600 font-medium mb-6">{sosMessage}</p>
                 <button 
                   onClick={() => setShowSosConfirm(false)}
-                  className="px-6 py-2 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200"
+                  className="px-6 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 w-full"
                 >
                   Close
                 </button>
@@ -630,6 +705,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
           </div>
         </div>
       )}
+
     </div>
   );
-};
+}

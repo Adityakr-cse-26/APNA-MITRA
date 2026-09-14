@@ -25,5 +25,11 @@
     "types": [
       "vite/client"
     ]
-  }
+  },
+  "exclude": [
+    "supabase",
+    "original_games.tsx",
+    "dist",
+    "node_modules"
+  ]
 }

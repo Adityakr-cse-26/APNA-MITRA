@@ -26,12 +26,21 @@ import { AdminDashboard } from "./components/AdminDashboard";
 import { SpreadsheetViewModal } from "./components/SpreadsheetViewModal";
 import { supabase } from "./supabase";
 import { User } from "@supabase/supabase-js";
-import { subscribeToUserProfile, saveUserProfile, subscribeToVitals, saveVitalReading, subscribeToMedications, saveMedication, subscribeToCheckins, saveCheckin } from "./services/db";
+import { subscribeToUserProfile, saveUserProfile, subscribeToVitals, saveVitalReading, subscribeToMedications, saveMedication, subscribeToCheckins, saveCheckin, fetchVitalsData } from "./services/db";
 
 import { exportDatabaseToCSV } from './utils/exportDatabase';
 import { Download, Table2 } from 'lucide-react';
 
 import { ChatbotWidget } from "./components/ChatbotWidget";
+import { GuardianMap } from "./components/GuardianMap";
+
+const CaretakerDashboard = ({ user, onLogout }) => (
+  <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center font-sans p-4 text-center">
+    <h2 className="text-2xl font-bold text-blue-800 mb-2">Caretaker Dashboard</h2>
+    <p className="text-gray-700 mb-6">Welcome, {user.user_metadata?.full_name || 'Caretaker'}. Monitoring tools coming soon.</p>
+    <button onClick={onLogout} className="px-6 py-2 bg-blue-600 text-white rounded-lg">Sign Out</button>
+  </div>
+);
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -90,39 +99,14 @@ export default function App() {
 
   // Registration Modal State
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  const [registrationTab, setRegistrationTab] = useState<"welcome" | "elderly" | "caretakers">("welcome");
 
   // Vitals State with localStorage persistence
-  const [vitals, setVitals] = useState<VitalReading[]>(() => {
-    const saved = localStorage.getItem("apna_mitra_vitals");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return [
-      { id: "v1", type: "bp", value: "124/82", unit: "mmHg", timestamp: "Today, 8:30 AM", status: "normal" },
-      { id: "v2", type: "sugar", value: "108", unit: "mg/dL", timestamp: "Today, 7:45 AM (Fasting)", status: "normal" },
-      { id: "v3", type: "hr", value: "74", unit: "BPM", timestamp: "Today, 8:30 AM", status: "normal" },
-      { id: "v4", type: "spo2", value: "98", unit: "%", timestamp: "Today, 8:30 AM", status: "normal" },
-      { id: "v5", type: "weight", value: "66.5", unit: "kg", timestamp: "Yesterday", status: "normal" },
-    ];
-  });
+  const [vitals, setVitals] = useState<VitalReading[]>([]);
+  const [vitalsError, setVitalsError] = useState<string | null>(null);
 
   // Medications State with localStorage persistence
-  const [medications, setMedications] = useState<Medication[]>(() => {
-    const saved = localStorage.getItem("apna_mitra_meds");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return [
-      { id: "m1", name: "Amlodipine (Blood Pressure)", dosage: "5 mg", timing: "Morning", instructions: "After breakfast", takenToday: true },
-      { id: "m2", name: "Metformin (Blood Sugar)", dosage: "500 mg", timing: "Morning", instructions: "With breakfast", takenToday: true },
-      { id: "m3", name: "Shelcal (Calcium + Vitamin D3)", dosage: "500 mg", timing: "Afternoon", instructions: "After lunch with water", takenToday: false },
-      { id: "m4", name: "Atorvastatin (Cholesterol)", dosage: "10 mg", timing: "Night", instructions: "After dinner before sleep", takenToday: false },
-    ];
-  });
+  const [medications, setMedications] = useState<Medication[]>([]);
 
   // Family Contacts State (Mapped from userProfile caretakers)
   const [contacts, setContacts] = useState<FamilyContact[]>(() => {
@@ -137,18 +121,7 @@ export default function App() {
   });
 
   // Daily Checkins State
-  const [checkins, setCheckins] = useState<DailyCheckin[]>(() => {
-    const saved = localStorage.getItem("apna_mitra_checkins");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return [
-      { id: "chk-1", date: new Date(Date.now() - 86400000).toISOString(), mood: "good", symptoms: ["Mild knee stiffness"], notes: "Morning park walk" },
-      { id: "chk-2", date: new Date(Date.now() - 172800000).toISOString(), mood: "great", symptoms: [], notes: "Felt very active" },
-    ];
-  });
+  const [checkins, setCheckins] = useState<DailyCheckin[]>([]);
 
   // Modals state
   const [isSymptomCheckerOpen, setIsSymptomCheckerOpen] = useState(false);
@@ -160,6 +133,8 @@ export default function App() {
   const [isSpreadsheetViewOpen, setIsSpreadsheetViewOpen] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [invalidRole, setInvalidRole] = useState<boolean>(false);
   const [roleChecked, setRoleChecked] = useState(false);
 
   // Supabase Auth Effect
@@ -167,51 +142,58 @@ export default function App() {
     let mounted = true;
     let isChecking = false;
 
-    const checkAdmin = async (user) => {
-      if (isChecking) return;
-      isChecking = true;
+        const checkAdmin = async (user, retryCount = 0) => {
+      if (isChecking && retryCount === 0) return;
+      if (retryCount === 0) isChecking = true;
 
       try {
-        const { data } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-        const dbRole = data?.role?.toLowerCase()?.trim();
-        const metaRole = user.user_metadata?.role?.toLowerCase()?.trim();
-        const role = dbRole || metaRole || 'patient';
+        const { data, error } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
         
+        if (error && error.code === 'PGRST303' && retryCount < 3) {
+          console.warn('JWT clock skew, retrying in 1s...', retryCount);
+          setTimeout(() => { if (mounted) checkAdmin(user, retryCount + 1); }, 1000);
+          return;
+        }
+
+        const role = data?.role?.toLowerCase()?.trim();
+        
+        if (!role || !['patient', 'admin', 'caretaker', 'guardian'].includes(role)) {
+            if (mounted) {
+                setInvalidRole(true);
+                setRoleChecked(true);
+            }
+            isChecking = false;
+            return;
+        }
+
         const intendedPortal = sessionStorage.getItem('intended_portal');
         if (intendedPortal) {
           sessionStorage.removeItem('intended_portal');
           
-          if (intendedPortal === 'guardian' && role !== 'guardian') {
-            await supabase.auth.signOut();
-            sessionStorage.setItem('authError', "This is a patient account. Please use Patient Login.");
-            if (mounted) {
-              setCurrentUser(null);
-              setRoleChecked(true);
-            }
-            isChecking = false;
-            return;
-          }
-          
-          if (intendedPortal === 'patient' && role === 'guardian') {
-            await supabase.auth.signOut();
-            sessionStorage.setItem('authError', "This is a guardian account. Please use Guardian Login.");
-            if (mounted) {
-              setCurrentUser(null);
-              setRoleChecked(true);
-            }
-            isChecking = false;
-            return;
+          if (intendedPortal !== role) {
+             // For safety, but allow patient/guardian mismatches to be handled if needed
+             if (intendedPortal !== role && ['patient', 'admin', 'caretaker'].includes(intendedPortal) && ['patient', 'admin', 'caretaker'].includes(role)) {
+                 await supabase.auth.signOut();
+                 sessionStorage.setItem('authError', `This is a ${role} account. Please use the correct login.`);
+                 if (mounted) {
+                     setCurrentUser(null);
+                     setRoleChecked(true);
+                 }
+                 isChecking = false;
+                 return;
+             }
           }
         }
-        
+
         if (mounted) {
+          setUserRole(role);
           setIsAdmin(role === 'admin');
           if (role === 'admin') setShowAdminDashboard(true);
         }
       } catch (err) {
         console.error("Error checking role:", err);
         if (mounted) {
-          setIsAdmin(false);
+          setInvalidRole(true);
         }
       } finally {
         if (mounted) {
@@ -220,7 +202,7 @@ export default function App() {
         isChecking = false;
       }
     };
-
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
       const user = session?.user ?? null;
       if (mounted) {
@@ -304,7 +286,7 @@ export default function App() {
     });
     
     const unsubscribeVitals = subscribeToVitals(currentUser.id, (v) => {
-      setVitals(v.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime() || -1));
+      setVitals(v); // Already sorted descending by DB
     });
 
     const unsubscribeMeds = subscribeToMedications(currentUser.id, (m) => {
@@ -336,23 +318,49 @@ export default function App() {
     }
   };
 
-  const handleSaveProfile = (updated: ElderlyProfile) => {
+  const handleSaveProfile = async (updated: ElderlyProfile) => {
     setUserProfile(updated);
     if (currentUser) {
-      saveUserProfile(currentUser.id, updated);
+      const { saveUserProfile, subscribeToUserProfile, savePushSubscription } = await import('./services/db');
+      await saveUserProfile(currentUser.id, updated);
+      
+      // Re-fetch to get real UUIDs for newly inserted caretakers
+      subscribeToUserProfile(currentUser.id, (profile) => {
+        if (profile) setUserProfile(profile);
+      });
+      
+      if ((window as any).__pendingPushSubscription) {
+        await savePushSubscription(currentUser.id, (window as any).__pendingPushSubscription);
+        (window as any).__pendingPushSubscription = null;
+      }
     }
   };
 
-  const handleAddVital = (newVital: Omit<VitalReading, "id" | "timestamp">) => {
+  const loadHealthDashboard = async () => {
+    if (!currentUser) return;
+    try {
+      setVitalsError(null);
+      const v = await fetchVitalsData(currentUser.id);
+      setVitals(v);
+    } catch (e: any) {
+      console.error("Failed to refresh health dashboard", e);
+      setVitalsError(e.message || "Failed to load health readings.");
+    }
+  };
+
+  const handleAddVital = async (newVital: Omit<VitalReading, "id" | "timestamp">) => {
+    if (!currentUser) throw new Error("Not logged in");
+    
     const item: VitalReading = {
       ...newVital,
       id: `v-${Date.now()}`,
-      timestamp: `Today, ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+      timestamp: new Date().toISOString(),
     };
-    setVitals((prev) => [item, ...prev]);
-    if (currentUser) {
-      saveVitalReading(currentUser.id, item);
-    }
+    
+    await saveVitalReading(currentUser.id, item);
+    
+    // Refresh strictly from database to guarantee dashboard is in sync
+    await loadHealthDashboard();
   };
 
   const handleToggleMedication = (id: string) => {
@@ -419,15 +427,22 @@ export default function App() {
 
   
   if (window.location.pathname === '/reset-password') {
-    return <ResetPasswordScreen />;
+    return <ResetPasswordScreen onResetComplete={() => window.location.href = '/'} />;
+  }
+
+  const path = window.location.pathname;
+  if (path.startsWith('/guardian/map/')) {
+    const alertId = path.replace('/guardian/map/', '');
+    return <GuardianMap alertId={alertId} />;
   }
 
   if (authChecking || (currentUser && !roleChecked)) {
-    return <div className="min-h-screen bg-[#F4F7F4] flex items-center justify-center font-sans">Loading...</div>;
+    return <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center font-sans">Loading...</div>;
   }
 
   if (!currentUser && !isGuest) {
-    return <AuthScreen onSuccess={() => {}} currentLang={currentLang} onGuestLogin={() => setIsGuest(true)} />;
+    return <AuthScreen onSuccess={() => {}} currentLang={currentLang}
+ onGuestLogin={() => setIsGuest(true)} />;
   }
 
 
@@ -441,13 +456,27 @@ export default function App() {
     email: "demo@example.com"
   } as User;
 
-  if (isAdmin) {
+  if (invalidRole) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center font-sans p-4 text-center">
+        <h2 className="text-xl font-bold text-red-600 mb-2">Access Denied</h2>
+        <p className="text-gray-700 mb-6">Your account role is not configured. Please contact the administrator.</p>
+        <button onClick={handleLogout} className="px-6 py-2 bg-[#153A34] text-white rounded-lg">Sign Out</button>
+      </div>
+    );
+  }
+
+  if (userRole === 'admin') {
     return <AdminDashboard user={effectiveUser} onLogout={handleLogout} />;
+  }
+  
+  if (userRole === 'caretaker' || userRole === 'guardian') {
+      return <CaretakerDashboard user={effectiveUser} onLogout={handleLogout} />;
   }
 
   return (
     <div 
-      className="min-h-screen bg-[#F4F7F4] text-[#22312B] flex flex-col font-sans transition-all duration-150"
+      className="min-h-screen bg-[#FAFAFA] text-[#22312B] flex flex-col font-sans transition-all duration-150"
       style={{ fontSize: `${16 * fontScale}px` }}
     >
       {/* Top Navigation */}
@@ -455,10 +484,11 @@ export default function App() {
         isAdmin={isAdmin}
         onOpenAdminDashboard={() => setShowAdminDashboard(true)}
         currentLang={currentLang}
+
         onLanguageChange={setCurrentLang}
         fontScale={fontScale}
         onFontScaleChange={setFontScale}
-        onOpenRegistration={() => setIsRegistrationOpen(true)}
+        onOpenRegistration={() => { setRegistrationTab("welcome"); setIsRegistrationOpen(true); }}
         user={effectiveUser}
         onLogout={handleLogout}
       />
@@ -466,17 +496,23 @@ export default function App() {
       {/* Main Content Sections */}
       <main className="flex-1">
         
-        <PatientDashboardView 
+        <PatientDashboardView onOpenMedicineReminder={() => setIsMedicineReminderOpen(true)}
+          onOpenProfile={() => { setRegistrationTab("elderly"); setIsRegistrationOpen(true); }} 
           user={effectiveUser} 
           onLogout={handleLogout}
           onOpenSymptomChecker={() => setIsSymptomCheckerOpen(true)}
          currentLang={currentLang}
+
+
         />
         
         {/* FLOWCHART MODULE 2: CARE & HEALTH DASHBOARD */}
         <HealthDashboard
           currentLang={currentLang}
+
+
           vitals={vitals}
+          vitalsError={vitalsError}
           onAddVital={handleAddVital}
           onOpenCheckin={() => setIsDailyCheckinOpen(true)}
           streakCount={Math.min(checkins.length + 1, 7)}
@@ -485,33 +521,45 @@ export default function App() {
         {/* FLOWCHART MODULE 3: BRAIN GAMES & DAILY ACTIVITIES */}
         <GamesActivitySection
           currentLang={currentLang}
+
+
+          user={effectiveUser}
         />
 
         {/* FLOWCHART MODULE 4: NEARBY DOCTORS, HOSPITALS & MEDICINE SHOPS */}
         <NearbyDirectorySection
           currentLang={currentLang}
+
+
           user={effectiveUser}
         />
         
         {/* FLOWCHART MODULE 5: GOVERNMENT WELFARE SCHEMES */}
         <SeniorSchemesSection
           currentLang={currentLang}
-        />
 
-        {/* EMERGENCY SOS & SPEED DIAL DISPATCH */}
-        <div id="emergency-section">
-          <EmergencySection
-            currentLang={currentLang}
-            contacts={contacts}
-          />
-        </div>
+
+        />
 
       </main>
 
-      <BooksSection currentLang={currentLang} />
+      <BooksSection currentLang={currentLang}
+ />
+
+      {/* EMERGENCY SOS & SPEED DIAL DISPATCH */}
+      <div id="emergency-section">
+        <EmergencySection
+          currentLang={currentLang}
+          user={effectiveUser}
+          contacts={contacts}
+        />
+      </div>
+
+      <TrustPrivacySection currentLang={currentLang} />
 
       {/* Footer */}
-      <Footer currentLang={currentLang} />
+      <Footer currentLang={currentLang}
+ />
 
       {/* Floating Action Buttons (Accessibility & Quick SOS) */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 print:hidden">
@@ -520,7 +568,7 @@ export default function App() {
         
         {/* Profile / Caretaker Button */}
         <button
-          onClick={() => setIsRegistrationOpen(true)}
+          onClick={() => { setRegistrationTab("elderly"); setIsRegistrationOpen(true); }}
           className="px-3.5 py-2 bg-white text-[#153A34] hover:bg-[#EEF3EA] rounded-full shadow-lg flex items-center gap-1.5 border border-[#D8E2DA] text-xs font-bold transition transform hover:scale-105 active:scale-95"
           title="Senior Profile & Caretaker Settings"
         >
@@ -553,6 +601,7 @@ export default function App() {
         <RegistrationModal
           currentLang={currentLang}
           profile={userProfile}
+          initialTab={registrationTab}
           onSaveProfile={handleSaveProfile}
           onClose={() => setIsRegistrationOpen(false)}
         />
@@ -562,6 +611,8 @@ export default function App() {
       {isSymptomCheckerOpen && (
         <SymptomCheckerModal
           currentLang={currentLang}
+
+
           user={effectiveUser}
           onClose={() => setIsSymptomCheckerOpen(false)}
           onOpenEmergency={() => {
@@ -574,6 +625,8 @@ export default function App() {
       {isReportAnalyzerOpen && (
         <ReportAnalyzerModal
           currentLang={currentLang}
+
+
           onClose={() => setIsReportAnalyzerOpen(false)}
         />
       )}
@@ -581,6 +634,8 @@ export default function App() {
       {isMedicineReminderOpen && (
         <MedicineReminderModal
           currentLang={currentLang}
+
+
           medications={medications}
           onToggleMedication={handleToggleMedication}
           onAddMedication={handleAddMedication}
@@ -592,6 +647,8 @@ export default function App() {
       {isDoctorVisitPrepOpen && (
         <DoctorVisitPrepModal
           currentLang={currentLang}
+
+
           vitals={vitals}
           medications={medications}
           onClose={() => setIsDoctorVisitPrepOpen(false)}
@@ -602,6 +659,8 @@ export default function App() {
       {isDailyCheckinOpen && (
         <DailyCheckinModal
           currentLang={currentLang}
+
+
           checkins={checkins}
           onSaveCheckin={handleSaveCheckin}
           onClose={() => setIsDailyCheckinOpen(false)}
