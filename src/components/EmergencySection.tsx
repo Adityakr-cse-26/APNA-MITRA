@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   AlertTriangle, 
   PhoneCall, 
@@ -11,7 +11,7 @@ import {
   Ambulance,
   Phone
 } from "lucide-react";
-import { Language, FamilyContact } from "../types";
+import { Language, FamilyContact, ElderlyProfile } from "../types";
 import { getCurrentLocation } from "../utils/geolocation";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "../supabase";
@@ -21,20 +21,102 @@ interface EmergencySectionProps {
   currentLang: Language;
   contacts: FamilyContact[];
   user: User;
+  profile?: ElderlyProfile;
 }
 
 export const EmergencySection: React.FC<EmergencySectionProps> = ({
   currentLang,
   contacts,
   user,
+  profile,
 }) => {
   const t = translations[currentLang];
   const [sosSent, setSosSent] = useState(false);
   const [sosMessage, setSosMessage] = useState("");
   const [showIceCard, setShowIceCard] = useState(false);
-  const [bloodGroup, setBloodGroup] = useState("B+");
-  const [allergies, setAllergies] = useState("None reported / Penicillin sensitive");
-  const [chronicConditions, setChronicConditions] = useState("Hypertension (Managed)");
+  const [showIceCardBack, setShowIceCardBack] = useState(false);
+  const [bloodGroup, setBloodGroup] = useState(profile?.bloodGroup || "B+");
+  const [allergies, setAllergies] = useState(profile?.allergies || "None reported");
+  const [chronicConditions, setChronicConditions] = useState(profile?.basicHealthInfo || "None");
+
+  const [nearestHospital, setNearestHospital] = useState<{name: string, distanceKm: number, timeMins: number} | null>(null);
+  const [loadingHospital, setLoadingHospital] = useState(true);
+
+  // Helper to calculate distance in km using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    return R * c;
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchHospital = async () => {
+      try {
+        const loc = await getCurrentLocation();
+        if (!loc || !mounted) {
+            setLoadingHospital(false);
+            return;
+        }
+        
+        // Use Nominatim API for faster and more reliable hospital search within ~5.5km
+        const size = 0.05;
+        const viewbox = `${loc.longitude - size},${loc.latitude + size},${loc.longitude + size},${loc.latitude - size}`;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=hospital&viewbox=${viewbox}&bounded=1&limit=10`;
+        
+        const res = await fetch(url, {
+           headers: { 
+             'Accept': 'application/json',
+             'User-Agent': 'ApnaMitraApp/1.0'
+           },
+           signal: AbortSignal.timeout(15000)
+        });
+        
+        if (!res.ok) throw new Error("Nominatim API failed");
+        const data = await res.json();
+        
+        if (data && data.length > 0 && mounted) {
+           let closest = null;
+           let minDistance = Infinity;
+           
+           data.forEach((el: any) => {
+             if (el.name) {
+               const elLat = parseFloat(el.lat);
+               const elLon = parseFloat(el.lon);
+               if (!isNaN(elLat) && !isNaN(elLon)) {
+                 const dist = calculateDistance(loc.latitude, loc.longitude, elLat, elLon);
+                 if (dist < minDistance) {
+                   minDistance = dist;
+                   closest = el.name;
+                 }
+               }
+             }
+           });
+           
+           if (closest) {
+             setNearestHospital({
+               name: closest,
+               distanceKm: Number(minDistance.toFixed(1)),
+               timeMins: Math.max(1, Math.ceil(minDistance * 4)) // Roughly 4 mins per km in city traffic
+             });
+           }
+        }
+      } catch (err) {
+        console.error("Failed to fetch nearest hospital:", err);
+      } finally {
+        if (mounted) setLoadingHospital(false);
+      }
+    };
+    
+    fetchHospital();
+    return () => { mounted = false; };
+  }, []);
 
   const handleTriggerSOS = async () => {
     setSosSent(true);
@@ -168,8 +250,15 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
               <span><strong>Guardians:</strong> {contacts.length} Family Members Connected</span>
             </div>
             <div className="flex items-center gap-2 bg-white/15 px-3.5 py-2.5 rounded-xl backdrop-blur-xs">
-              <Ambulance className="w-4 h-4 text-rose-300" />
-              <span><strong>Nearest Trauma:</strong> AIIMS Delhi (1.4 km, 4 min)</span>
+              <Ambulance className="w-4 h-4 text-rose-300 shrink-0" />
+              <span className="truncate">
+                <strong>Nearest Hospital:</strong>{" "}
+                {loadingHospital 
+                  ? "Locating nearby hospitals..." 
+                  : nearestHospital 
+                    ? `${nearestHospital.name} (${nearestHospital.distanceKm} km, ~${nearestHospital.timeMins} min)` 
+                    : "No hospitals found within 10km"}
+              </span>
             </div>
           </div>
 
@@ -286,93 +375,210 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
           </div>
         </div>
 
-        {/* ICE (In Case of Emergency) Card */}
+        {/* ICE (In Case of Emergency) Card Modal */}
         {showIceCard && (
-          <div className="bg-white rounded-2xl p-6 sm:p-8 border-2 border-rose-300 shadow-xl max-w-3xl mx-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-[#F3F5F4] mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-bold">
-                  ICE
-                </div>
-                <div>
-                  <h3 className="font-serif text-xl font-bold text-[#153A34]">
-                    Emergency Medical Identity (ICE Card)
-                  </h3>
-                  <p className="text-xs text-[#5B6B60]">Visible to emergency first responders and doctors</p>
-                </div>
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+            <div className="w-full max-w-3xl my-8 animate-in fade-in zoom-in duration-200 relative">
+              
+              {/* Close and Print Actions */}
+              <div className="absolute -top-12 right-0 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-white hover:bg-gray-100 text-[#1F4E46] rounded-xl text-sm font-bold shadow-lg flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                  Print
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowIceCard(false)}
+                  className="p-2 bg-white hover:bg-rose-50 text-rose-600 rounded-xl shadow-lg"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="px-3.5 py-1.5 bg-[#F3F5F4] hover:bg-[#DCEAE4] text-[#1F4E46] rounded-xl text-xs font-bold"
-              >
-                Print Card
-              </button>
-            </div>
+              {/* CARD FLIPPING LOGIC */}
+              {!showIceCardBack ? (
+                /* CARD 1: FRONT */
+                <div 
+                  onClick={() => setShowIceCardBack(true)}
+                  className="bg-[#f9fafb] rounded-[2rem] border-2 border-gray-200 shadow-xl overflow-hidden relative w-full aspect-auto sm:aspect-[1.58] max-h-none sm:max-h-[500px] flex flex-col pb-16 sm:pb-0 cursor-pointer hover:shadow-2xl transition-all"
+                >
+                  <div className="absolute top-4 right-4 z-10 text-[10px] sm:text-xs font-bold text-gray-500 bg-white/90 px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1 border border-gray-200">
+                    Tap to flip <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5"/><polyline points="9 22 5 15 9 8"/></svg>
+                  </div>
+                  
+                  {/* Header */}
+                  <div className="bg-[#D32F2F] text-white text-center py-3 sm:py-4 px-6 rounded-t-[1.7rem] mx-2 mt-2 shadow-sm">
+                    <h2 className="text-lg sm:text-2xl font-bold tracking-wide pr-24 sm:pr-0">APNA MITRA • EMERGENCY HEALTH CARD</h2>
+                  </div>
+                  <div className="text-center mt-1 sm:mt-2">
+                    <span className="text-[#00897B] font-bold text-xs sm:text-sm tracking-wide">अपनों का साथ, हर उम्र में खास ♡</span>
+                  </div>
+                  
+                  {/* Body */}
+                  <div className="flex flex-col sm:flex-row px-4 sm:px-8 py-4 sm:py-4 gap-4 sm:gap-6 flex-1 items-center sm:items-stretch">
+                    {/* Photo section */}
+                    <div className="w-24 h-32 sm:w-32 sm:h-40 bg-[#E3F2FD] rounded-2xl border border-blue-100 flex flex-col items-center justify-center text-center p-2 shadow-inner shrink-0">
+                      <span className="text-[#1565C0] font-bold text-base sm:text-lg mb-1">PHOTO</span>
+                      <span className="text-[#546E7A] text-[9px] sm:text-[10px]">Upload profile photo</span>
+                    </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <div className="p-3.5 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0]">
-                <span className="text-[10px] font-bold text-[#5B6B60] uppercase block">Blood Group</span>
-                <input
-                  type="text"
-                  value={bloodGroup}
-                  onChange={(e) => setBloodGroup(e.target.value)}
-                  className="w-full font-bold text-lg text-[#153A34] bg-transparent focus:outline-none"
-                />
-              </div>
-
-              <div className="p-3.5 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0]">
-                <span className="text-[10px] font-bold text-[#5B6B60] uppercase block">Known Allergies</span>
-                <input
-                  type="text"
-                  value={allergies}
-                  onChange={(e) => setAllergies(e.target.value)}
-                  className="w-full text-xs font-semibold text-[#153A34] bg-transparent focus:outline-none"
-                />
-              </div>
-
-              <div className="p-3.5 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0]">
-                <span className="text-[10px] font-bold text-[#5B6B60] uppercase block">Key Conditions</span>
-                <input
-                  type="text"
-                  value={chronicConditions}
-                  onChange={(e) => setChronicConditions(e.target.value)}
-                  className="w-full text-xs font-semibold text-[#153A34] bg-transparent focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Saved Family Emergency Contacts */}
-            <div>
-              <span className="text-xs font-bold text-[#35483F] uppercase tracking-wider block mb-2.5">
-                Primary Emergency Contacts
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {contacts.map((c) => (
-                  <div
-                    key={c.id}
-                    className="p-3.5 bg-[#FAFAFA] rounded-2xl border border-[#E2E4E0] flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[#1F4E46] text-white flex items-center justify-center text-xs font-bold">
-                        {c.avatar}
+                    {/* Details section */}
+                    <div className="flex-1 grid grid-cols-2 gap-y-4 sm:gap-y-4 gap-x-2 w-full">
+                      <div className="col-span-2 sm:col-span-1">
+                        <div className="text-[#D32F2F] text-[10px] sm:text-xs font-bold uppercase mb-0.5">NAME</div>
+                        <div className="text-[#263238] font-bold text-base sm:text-lg truncate uppercase">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || "[FULL NAME]"}</div>
                       </div>
-                      <div>
-                        <div className="text-xs font-bold text-[#153A34]">{c.name} ({c.relation})</div>
-                        <div className="text-[11px] text-[#5B6B60] font-mono">{c.phone}</div>
+                      
+                      <div className="col-span-2 sm:col-span-1">
+                        <div className="text-[#D32F2F] text-[10px] sm:text-xs font-bold uppercase mb-0.5">BLOOD GROUP</div>
+                        <select 
+                            value={bloodGroup} 
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setBloodGroup(e.target.value)} 
+                            className="text-[#263238] font-bold text-base sm:text-lg bg-transparent border-b border-dashed border-gray-300 w-full max-w-[120px] focus:outline-none uppercase appearance-none cursor-pointer"
+                        >
+                          <option value="">[Select]</option>
+                          <option value="A+">A+</option>
+                          <option value="A-">A-</option>
+                          <option value="B+">B+</option>
+                          <option value="B-">B-</option>
+                          <option value="O+">O+</option>
+                          <option value="O-">O-</option>
+                          <option value="AB+">AB+</option>
+                          <option value="AB-">AB-</option>
+                        </select>
+                      </div>
+
+                      <div className="col-span-2 sm:col-span-1">
+                        <div className="text-[#D32F2F] text-[10px] sm:text-xs font-bold uppercase mb-0.5">DATE OF BIRTH</div>
+                        <div className="text-[#263238] font-bold text-base sm:text-lg">
+                          {profile?.dob && profile.dob.split('-').length === 3
+                            ? `${profile.dob.split('-')[2]} / ${profile.dob.split('-')[1]} / ${profile.dob.split('-')[0]}`
+                            : "[DD / MM / YYYY]"}
+                        </div>
+                      </div>
+                      
+                      <div className="col-span-2 sm:col-span-1">
+                        <div className="text-[#D32F2F] text-[10px] sm:text-xs font-bold uppercase mb-0.5">EMERGENCY ID</div>
+                        <div className="text-[#263238] font-bold text-base sm:text-lg">AM-{user?.id?.substring(0,4).toUpperCase()}-{user?.id?.substring(4,8).toUpperCase()}</div>
                       </div>
                     </div>
 
-                    <a
-                      href={`tel:${c.phone}`}
-                      className="p-2 bg-[#E8A33D] text-white rounded-xl text-xs hover:bg-[#d4902b] transition"
-                    >
-                      <Phone className="w-3.5 h-3.5" />
-                    </a>
+                    {/* Right corner QR & Icon */}
+                    <div className="hidden sm:flex flex-col items-center justify-between shrink-0 pl-2 py-2">
+                      <div className="w-16 h-16 border border-gray-300 rounded-xl flex items-center justify-center flex-col shadow-sm bg-white">
+                        <span className="text-[#1565C0] font-bold text-sm">QR</span>
+                        <span className="text-[6px] text-gray-500 leading-tight text-center mt-1">Scan for<br/>health profile</span>
+                      </div>
+                      <div className="w-16 h-16 rounded-full border-2 border-slate-700 flex items-center justify-center mt-2 relative bg-white shadow-sm">
+                         <div className="w-8 h-2.5 bg-[#D32F2F] absolute rounded-sm"></div>
+                         <div className="h-8 w-2.5 bg-[#D32F2F] absolute rounded-sm"></div>
+                         <span className="absolute bottom-1 right-2 text-[10px] text-[#00897B]">♡</span>
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
+
+                  {/* Footer */}
+                  <div className="bg-[#D32F2F] text-white text-center py-2 sm:py-3 px-4 sm:px-6 rounded-b-[1.7rem] mx-2 mb-2 absolute bottom-0 left-0 right-0 shadow-sm">
+                    <p className="text-[9px] sm:text-xs font-bold tracking-wider uppercase">IN AN EMERGENCY • CHECK THIS CARD FIRST • CALL LOCAL EMERGENCY SERVICES</p>
+                  </div>
+                </div>
+              ) : (
+                /* CARD 2: BACK */
+                <div 
+                  onClick={() => setShowIceCardBack(false)}
+                  className="bg-[#f9fafb] rounded-[2rem] border-2 border-gray-200 shadow-xl overflow-hidden relative w-full flex flex-col pt-2 pb-2 cursor-pointer hover:shadow-2xl transition-all animate-in fade-in zoom-in-95 duration-200"
+                >
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setShowIceCardBack(false); }}
+                    className="absolute top-4 left-4 z-10 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-gray-600 shadow-sm hover:bg-white border border-gray-200"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                  </button>
+
+                  {/* Header */}
+                  <div className="bg-[#D32F2F] text-white text-center py-3 sm:py-4 px-6 rounded-t-[1.7rem] mx-2 mt-0 shadow-sm">
+                    <h2 className="text-lg sm:text-2xl font-bold tracking-wide">APNA MITRA • EMERGENCY HEALTH CARD</h2>
+                  </div>
+                  <div className="text-center mt-1 sm:mt-2 mb-3 sm:mb-4">
+                    <span className="text-[#00897B] font-bold text-xs sm:text-sm tracking-wide">अपनों का साथ, हर उम्र में खास ♡</span>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row px-4 sm:px-6 gap-4 sm:gap-6 mb-16 sm:mb-20" onClick={(e) => e.stopPropagation()}>
+                    {/* Contacts side */}
+                    <div className="flex-1 flex flex-col">
+                      <div className="bg-[#D32F2F] text-white text-center py-2 px-4 rounded-t-xl font-bold text-[11px] sm:text-sm tracking-wide shadow-sm">
+                        IN CASE OF EMERGENCY, CALL
+                      </div>
+                      <div className="border-x border-b border-red-100 rounded-b-xl p-4 bg-red-50/50 shadow-sm flex-1">
+                        <div className="mb-4">
+                          <div className="text-[#D32F2F] text-[10px] font-bold uppercase mb-0.5">Primary Contact</div>
+                          <div className="text-[#263238] font-bold text-sm sm:text-base">{contacts[0]?.name || "[Guardian / Family]"} {contacts[0]?.relation ? `(${contacts[0].relation})` : ''}</div>
+                          <div className="text-[#546E7A] text-xs sm:text-sm font-mono mt-0.5">Phone: {contacts[0]?.phone || "[XXXXXXXXXX]"}</div>
+                        </div>
+                        {contacts.length > 1 && (
+                        <div>
+                          <div className="text-[#D32F2F] text-[10px] font-bold uppercase mb-0.5">Secondary Contact</div>
+                          <div className="text-[#263238] font-bold text-sm sm:text-base">{contacts[1].name} {contacts[1].relation ? `(${contacts[1].relation})` : ''}</div>
+                          <div className="text-[#546E7A] text-xs sm:text-sm font-mono mt-0.5">Phone: {contacts[1].phone}</div>
+                        </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Health Info Side */}
+                    <div className="flex-1 flex flex-col">
+                      <div className="bg-[#D32F2F] text-white text-center py-2 px-4 rounded-t-xl font-bold text-[11px] sm:text-sm tracking-wide shadow-sm">
+                        IMPORTANT HEALTH INFORMATION
+                      </div>
+                      <div className="border-x border-b border-red-100 rounded-b-xl p-4 bg-red-50/50 shadow-sm flex flex-col justify-center gap-3 flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <span className="text-[#D32F2F] text-[10px] font-bold uppercase sm:w-24 shrink-0">Allergies</span>
+                          <input 
+                            value={allergies} 
+                            onChange={(e) => setAllergies(e.target.value)}
+                            className="text-[#263238] font-bold text-xs sm:text-sm bg-transparent border-b border-dashed border-gray-300 focus:outline-none w-full" 
+                            placeholder="[None / Specify]"
+                          />
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <span className="text-[#D32F2F] text-[10px] font-bold uppercase sm:w-24 shrink-0">Conditions</span>
+                          <input 
+                            value={chronicConditions} 
+                            onChange={(e) => setChronicConditions(e.target.value)}
+                            className="text-[#263238] font-bold text-xs sm:text-sm bg-transparent border-b border-dashed border-gray-300 focus:outline-none w-full" 
+                            placeholder="[Asthma / Diabetes / etc.]"
+                          />
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <span className="text-[#D32F2F] text-[10px] font-bold uppercase sm:w-24 shrink-0">Medications</span>
+                          <input 
+                            defaultValue="[Medicine + dose]"
+                            className="text-[#263238] font-bold text-xs sm:text-sm bg-transparent border-b border-dashed border-gray-300 focus:outline-none w-full placeholder-gray-400" 
+                          />
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <span className="text-[#D32F2F] text-[10px] font-bold uppercase sm:w-24 shrink-0">Special Notes</span>
+                          <input 
+                            defaultValue="[Critical information]"
+                            className="text-[#263238] font-bold text-xs sm:text-sm bg-transparent border-b border-dashed border-gray-300 focus:outline-none w-full placeholder-gray-400" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="bg-[#D32F2F] text-white text-center py-2 sm:py-3 px-4 sm:px-6 rounded-b-[1.7rem] mx-2 mb-2 absolute bottom-0 left-0 right-0 shadow-sm pointer-events-none">
+                    <p className="text-[8px] sm:text-[10px] font-bold tracking-wider uppercase">KEEP THIS CARD WITH YOU • UPDATE YOUR DETAILS REGULARLY • USE ONLY WITH CONSENT</p>
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         )}

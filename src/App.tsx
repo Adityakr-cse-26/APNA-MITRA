@@ -552,6 +552,7 @@ export default function App() {
           currentLang={currentLang}
           user={effectiveUser}
           contacts={contacts}
+          profile={userProfile}
         />
       </div>
 

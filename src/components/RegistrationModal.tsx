@@ -40,7 +40,26 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   // Elderly Form State
   const [elderlyName, setElderlyName] = useState(profile.name || "Dada Ji (Ramakant Sharma)");
   const [elderlyPhone, setElderlyPhone] = useState(profile.phone || "+91 98765 43210");
+  const [elderlyDob, setElderlyDob] = useState(profile.dob || "");
   const [elderlyAge, setElderlyAge] = useState(profile.age || "72");
+  
+  const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDob = e.target.value;
+    setElderlyDob(newDob);
+    if (newDob) {
+      const birthDate = new Date(newDob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      if (age >= 0) {
+        setElderlyAge(age.toString());
+      }
+    }
+  };
+
   const [elderlyGender, setElderlyGender] = useState(profile.gender || "Male");
   const [bloodGroup, setBloodGroup] = useState(profile.bloodGroup || "B+");
   const [basicHealthInfo, setBasicHealthInfo] = useState(
@@ -157,6 +176,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
       name: elderlyName,
       phone: elderlyPhone,
       age: elderlyAge,
+      dob: elderlyDob,
       gender: elderlyGender,
       bloodGroup,
       basicHealthInfo,
@@ -346,14 +366,23 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     required
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#2A3D34] mb-1">Date of Birth</label>
+                    <input
+                      type="date"
+                      value={elderlyDob}
+                      onChange={handleDobChange}
+                      className="w-full px-3.5 py-2.5 bg-white border border-[#E2E4E0] rounded-xl text-xs font-medium focus:outline-none focus:border-[#1F4E46]"
+                    />
+                  </div>
                   <div>
                     <label className="block text-xs font-bold text-[#2A3D34] mb-1">Age</label>
                     <input
                       type="number"
                       value={elderlyAge}
                       onChange={(e) => setElderlyAge(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-[#E2E4E0] rounded-xl text-xs font-medium focus:outline-none focus:border-[#1F4E46]"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-[#E2E4E0] rounded-xl text-xs font-medium focus:outline-none focus:border-[#1F4E46]"
                     />
                   </div>
                   <div>
@@ -370,13 +399,21 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-[#2A3D34] mb-1">Blood</label>
-                    <input
-                      type="text"
+                    <select
                       value={bloodGroup}
                       onChange={(e) => setBloodGroup(e.target.value)}
-                      placeholder="e.g. B+"
-                      className="w-full px-3.5 py-2.5 bg-white border border-[#E2E4E0] rounded-xl text-xs font-medium focus:outline-none focus:border-[#1F4E46]"
-                    />
+                      className="w-full px-3.5 py-2.5 bg-white border border-[#E2E4E0] rounded-xl text-xs font-medium focus:outline-none focus:border-[#1F4E46] text-[#2A3D34]"
+                    >
+                      <option value="">Select...</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                    </select>
                   </div>
                 </div>
               </div>

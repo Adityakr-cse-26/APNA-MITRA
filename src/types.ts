@@ -191,6 +191,7 @@ export interface ElderlyProfile {
   name: string;
   phone: string;
   age: string;
+  dob?: string;
   gender: string;
   bloodGroup: string;
   basicHealthInfo: string;
