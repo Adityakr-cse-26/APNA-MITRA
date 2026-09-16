@@ -461,15 +461,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
             <HeartPulse className="w-32 h-32 text-emerald-200" />
           </div>
           <div className="relative z-10 flex flex-col items-center">
-            <div className="bg-white p-3 rounded-2xl mb-4 shadow-md inline-flex items-center justify-center">
+            <div className="bg-white p-3 rounded-2xl mb-6 shadow-md inline-flex items-center justify-center">
               <ApnaMitraLogo size="xl" variant="full" showTagline={false} />
             </div>
-            <h1 className="text-3xl font-extrabold text-white mb-2">{currentLang === 'hi' ? 'अपना मित्र' : currentLang === 'bn' ? 'আপন মিত্র' : 'Apna Mitra'}</h1>
             <p className="text-emerald-100 font-medium">{currentLang === 'hi' ? 'आपका स्वास्थ्य और गार्जियन डैशबोर्ड' : currentLang === 'bn' ? 'আপনার স্বাস্থ্য এবং অভিভাবক ড্যাশবোর্ড' : 'Your Health & Guardian Dashboard'}</p>
           </div>
         </div>
 
         <div className="p-8">
+          {authMode !== 'admin' && (
+            <div className="flex bg-gray-100 p-1 rounded-xl mb-6">
+              <button onClick={() => { setAuthMode('patient'); setIsLogin(true); setError(null); }} className={`flex-1 text-sm font-bold transition py-2 px-3 rounded-lg ${authMode === 'patient' && isLogin ? 'bg-white shadow-sm text-emerald-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}>
+                Patient Login
+              </button>
+              <button onClick={() => { setAuthMode('patient'); setIsLogin(false); setError(null); }} className={`flex-1 text-sm font-bold transition py-2 px-3 rounded-lg ${authMode === 'patient' && !isLogin ? 'bg-white shadow-sm text-emerald-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}>
+                Patient Registration
+              </button>
+            </div>
+          )}
           <h2 className="text-2xl font-bold text-[#153A34] mb-6 text-center">
             {isReset ? 'Reset Your Password' : isLogin ? (authMode === 'admin' ? 'Admin Sign In' : 'Sign In to Your Account') : (authMode === 'admin' ? 'Create Admin Account' : 'Create a New Account')}
           </h2>
@@ -581,11 +590,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
                       <button
                         type="button"
                         onClick={() => {
-                          setIsReset(true);
-                          setError(null);
-                          setResetSent(false);
+                          window.location.href = '/forgot-password';
                         }}
-                        className="text-sm text-emerald-600 hover:text-emerald-800 font-medium"
+                        className="text-sm text-gray-500 hover:text-gray-700 hover:underline font-medium transition-colors"
                       >
                         Forgot password?
                       </button>
@@ -651,7 +658,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mt-4"
+              className="w-full py-3.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 mt-4"
             >
               <ShieldCheck className="w-5 h-5" />
               {loading ? 'Please wait...' : isReset ? 'Send Reset Link' : isLogin ? 'Secure Sign In' : 'Register / Sign Up'}
@@ -659,18 +666,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
           </form>
 
           <div className="mt-8 text-center border-t border-gray-100 pt-6">
-            <div className="grid grid-cols-2 gap-4 text-sm mt-4">
-              <button onClick={() => { setAuthMode('patient'); setIsLogin(true); setError(null); }} className={`font-bold transition p-2 rounded-lg ${authMode === 'patient' && isLogin ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-50 text-gray-600 hover:bg-emerald-50'}`}>
-                Patient Login
-              </button>
-              <button onClick={() => { setAuthMode('patient'); setIsLogin(false); setError(null); }} className={`font-bold transition p-2 rounded-lg ${authMode === 'patient' && !isLogin ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-50 text-gray-600 hover:bg-emerald-50'}`}>
-                Patient Registration
-              </button>
-            </div>
-            
-            <div className="mt-6 flex justify-center">
-              <button onClick={() => { setAuthMode('admin'); setIsLogin(true); setError(null); }} className={`text-xs font-bold transition ${authMode === 'admin' ? 'text-emerald-700 underline' : 'text-gray-400 hover:text-gray-600'}`}>
-                Admin Login
+            <div className="flex justify-center">
+              <button onClick={() => { setAuthMode(authMode === 'admin' ? 'patient' : 'admin'); setIsLogin(true); setError(null); }} className={`text-sm font-bold transition px-4 py-2 rounded-lg underline underline-offset-2 ${authMode === 'admin' ? 'text-emerald-700 hover:bg-emerald-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
+                {authMode === 'admin' ? 'Back to Patient Login' : 'Admin Login'}
               </button>
             </div>
           </div>

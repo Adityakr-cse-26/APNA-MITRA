@@ -37,6 +37,7 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
   const [name, setName] = useState("");
   const [dosage, setDosage] = useState("");
   const [timing, setTiming] = useState<Medication["timing"]>("Morning");
+  const [scheduledTime, setScheduledTime] = useState("");
   const [instructions, setInstructions] = useState("After Food");
 
   const takenCount = medications.filter((m) => m.takenToday).length;
@@ -64,10 +65,12 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
       dosage: dosage.trim() || "1 tablet",
       timing,
       instructions: instructions.trim() || "As directed by physician",
+      scheduledTime: scheduledTime || undefined,
     });
 
     setName("");
     setDosage("");
+    setScheduledTime("");
     setShowAddForm(false);
   };
 
@@ -149,10 +152,11 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-[#5B6B60] mt-1">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-[#5B6B60] mt-1">
                     <span className="flex items-center gap-1 font-medium text-[#1F4E46]">
                       <Clock className="w-3 h-3" />
                       {med.timing}
+                      {med.scheduledTime && ` (${med.scheduledTime})`}
                     </span>
                     <span>•</span>
                     <span>{med.instructions}</span>
@@ -229,6 +233,15 @@ export const MedicineReminderModal: React.FC<MedicineReminderModalProps> = ({
                 </select>
               </div>
             </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-[#5B6B60] uppercase pl-1">Scheduled Time (Optional)</label>
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-white border border-[#E2E4E0] rounded-xl text-xs focus:outline-none mb-1"
+                />
+              </div>
 
             <div>
               <input

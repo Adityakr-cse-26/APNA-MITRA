@@ -22,9 +22,10 @@ import { Language, VitalReading, Medication, FamilyContact, DailyCheckin, Elderl
 import { Smartphone, AlertTriangle, ShieldCheck, MapPin } from "lucide-react";
 import { AuthScreen } from "./components/AuthScreen";
 import { ResetPasswordScreen } from "./components/ResetPasswordScreen";
+import { ForgotPasswordScreen } from "./components/ForgotPasswordScreen";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { SpreadsheetViewModal } from "./components/SpreadsheetViewModal";
-import { supabase } from "./supabase";
+import { supabase, isRecoveryMode } from "./supabase";
 import { User } from "@supabase/supabase-js";
 import { subscribeToUserProfile, saveUserProfile, subscribeToVitals, saveVitalReading, subscribeToMedications, saveMedication, subscribeToCheckins, saveCheckin, fetchVitalsData } from "./services/db";
 
@@ -33,6 +34,7 @@ import { Download, Table2 } from 'lucide-react';
 
 import { ChatbotWidget } from "./components/ChatbotWidget";
 import { GuardianMap } from "./components/GuardianMap";
+
 
 const CaretakerDashboard = ({ user, onLogout }) => (
   <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center font-sans p-4 text-center">
@@ -136,13 +138,14 @@ export default function App() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [invalidRole, setInvalidRole] = useState<boolean>(false);
   const [roleChecked, setRoleChecked] = useState(false);
+  const [isRecovery, setIsRecovery] = useState(isRecoveryMode);
 
   // Supabase Auth Effect
   useEffect(() => {
     let mounted = true;
     let isChecking = false;
 
-        const checkAdmin = async (user, retryCount = 0) => {
+    const checkAdmin = async (user, retryCount = 0) => {
       if (isChecking && retryCount === 0) return;
       if (retryCount === 0) isChecking = true;
 
@@ -223,6 +226,10 @@ export default function App() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+      }
+      
       const user = session?.user ?? null;
       if (mounted) {
         setCurrentUser(user);
@@ -426,8 +433,29 @@ export default function App() {
   }, []);
 
   
-  if (window.location.pathname === '/reset-password') {
-    return <ResetPasswordScreen onResetComplete={() => window.location.href = '/'} />;
+  const currentPath = window.location.pathname.toLowerCase().replace(/\/$/, '');
+  
+  // Bulletproof detection of recovery flow:
+  // 1. Explicit path matches
+  const isResetPath = currentPath === '/reset-password' || currentPath.endsWith('/reset-password');
+  // 2. Hash or query params containing 'type=recovery' (often dropped by strict routing but preserved in location)
+  const hasRecoveryParam = typeof window !== 'undefined' && (window.location.href.includes('type=recovery') || window.location.href.includes('access_token='));
+  // 3. Error states from expired/scanned links (Supabase adds ?error_description=...)
+  const hasAuthError = typeof window !== 'undefined' && (window.location.href.includes('error_description=') || window.location.href.includes('error_code='));
+
+  if (isResetPath || isRecovery || hasRecoveryParam || (hasAuthError && !currentUser && !authSuccess)) {
+    return (
+      <ResetPasswordScreen 
+        onResetComplete={() => {
+          setIsRecovery(false);
+          window.location.href = '/';
+        }} 
+      />
+    );
+  }
+
+  if (window.location.pathname === '/forgot-password') {
+    return <ForgotPasswordScreen />;
   }
 
   const path = window.location.pathname;

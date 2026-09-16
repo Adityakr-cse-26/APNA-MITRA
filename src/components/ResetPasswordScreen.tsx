@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { Eye, EyeOff, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Lock, CheckCircle2, AlertCircle, HeartPulse } from 'lucide-react';
 import { ApnaMitraLogo } from './ApnaMitraLogo';
 
 interface ResetPasswordScreenProps {
@@ -15,14 +15,54 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ onRese
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    // Check for errors from Supabase redirect (usually in hash, sometimes query)
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+    const searchParams = new URLSearchParams(window.location.search);
+    
+    const errorDesc = hashParams.get('error_description') || searchParams.get('error_description');
+    if (errorDesc) {
+      setError(errorDesc.replace(/\+/g, ' ') || "This password reset link is invalid or has expired. Please request a new password reset link.");
+      return;
+    }
+
+    // Verify session exists
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        // If not immediately available, wait a moment to see if it's still processing
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+          if (newSession) {
+            setError(null);
+          }
+        });
+        
+        // Timeout after 2 seconds if no session is established
+        setTimeout(() => {
+          supabase.auth.getSession().then(({ data: { session: finalSession } }) => {
+            if (!finalSession) {
+              setError("This password reset link is invalid or has expired. Please request a new password reset link.");
+            }
+            subscription.unsubscribe();
+          });
+        }, 2000);
+      }
+    });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
+
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      setError("Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
@@ -37,9 +77,8 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ onRese
       setSuccess(true);
       // Wait a bit, sign out so they have to login again with new password
       
-      
     } catch (err: any) {
-      setError(err.message || "Failed to update password");
+      setError(err.message || "Failed to update password. Your link may have expired.");
     } finally {
       setLoading(false);
     }
@@ -47,24 +86,34 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ onRese
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col justify-center items-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-[#E2E4E0]">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-[#E2E4E0] my-8">
         <div className="bg-emerald-800 p-8 text-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <HeartPulse className="w-32 h-32 text-emerald-200" />
+          </div>
           <div className="relative z-10 flex flex-col items-center">
-            <ApnaMitraLogo size="lg" variant="full" className="text-white filter brightness-0 invert mb-4" />
-            <h1 className="text-2xl font-bold text-white mb-2">Set New Password</h1>
-            <p className="text-emerald-100/90 text-sm font-medium px-4">
-              Create a new password for your account
-            </p>
+            <div className="bg-white p-3 rounded-2xl mb-4 shadow-md inline-flex items-center justify-center">
+              <ApnaMitraLogo size="xl" variant="full" showTagline={false} />
+            </div>
+            <h1 className="text-3xl font-extrabold text-white mb-2">Apna Mitra</h1>
+            <p className="text-emerald-100 font-medium">Your Health & Guardian Dashboard</p>
           </div>
         </div>
 
         <div className="p-8">
+          <h2 className="text-2xl font-bold text-[#153A34] mb-6 text-center">
+            Reset Password
+          </h2>
+          <p className="text-gray-600 text-sm font-medium mb-6 text-center">
+            Create a new password for your account
+          </p>
+          
           {success ? (
             <div className="text-center">
               <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="w-8 h-8 text-emerald-600" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Password reset successfully</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Your password has been updated successfully.</h3>
               <p className="text-gray-600 mb-6">Please login with your new password.</p>
               <button 
                 onClick={async () => {
@@ -107,6 +156,28 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ onRese
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                {password.length > 0 && (
+                  <div className="mt-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">Password requirements:</p>
+                    <ul className="text-xs space-y-1.5">
+                      <li className={`flex items-center gap-1.5 ${password.length >= 8 ? 'text-emerald-600' : 'text-gray-500'}`}>
+                        {password.length >= 8 ? <CheckCircle2 className="w-3.5 h-3.5" /> : '○'} At least 8 characters
+                      </li>
+                      <li className={`flex items-center gap-1.5 ${/[A-Z]/.test(password) ? 'text-emerald-600' : 'text-gray-500'}`}>
+                        {/[A-Z]/.test(password) ? <CheckCircle2 className="w-3.5 h-3.5" /> : '○'} One uppercase letter
+                      </li>
+                      <li className={`flex items-center gap-1.5 ${/[a-z]/.test(password) ? 'text-emerald-600' : 'text-gray-500'}`}>
+                        {/[a-z]/.test(password) ? <CheckCircle2 className="w-3.5 h-3.5" /> : '○'} One lowercase letter
+                      </li>
+                      <li className={`flex items-center gap-1.5 ${/[0-9]/.test(password) ? 'text-emerald-600' : 'text-gray-500'}`}>
+                        {/[0-9]/.test(password) ? <CheckCircle2 className="w-3.5 h-3.5" /> : '○'} One number
+                      </li>
+                      <li className={`flex items-center gap-1.5 ${/[^A-Za-z0-9]/.test(password) ? 'text-emerald-600' : 'text-gray-500'}`}>
+                        {/[^A-Za-z0-9]/.test(password) ? <CheckCircle2 className="w-3.5 h-3.5" /> : '○'} One special character
+                      </li>
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -134,7 +205,7 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ onRese
                 {loading ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <span>Reset Password</span>
+                  <span>Update Password</span>
                 )}
               </button>
             </form>
