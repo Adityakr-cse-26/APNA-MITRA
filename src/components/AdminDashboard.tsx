@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
+import { supabase, supabaseUrl } from '../supabase';
 import { User } from '@supabase/supabase-js';
 import { ApnaMitraLogo } from './ApnaMitraLogo';
 import * as tus from 'tus-js-client';
@@ -606,9 +606,7 @@ const BooksManager = () => {
            throw new Error('Not authenticated for large file upload.');
         }
         
-        let baseUrl = (import.meta.env.VITE_SUPABASE_URL || 'https://glytruwxtyhfkrstnygr.supabase.co').replace(/^[\"']|[\"']$/g, '').trim().replace(/\/$/, '');
-        if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
-        const uploadUrl = `${baseUrl}/storage/v1/upload/resumable`;
+        const uploadUrl = `${supabaseUrl}/storage/v1/upload/resumable`;
 
         const upload = new tus.Upload(file, {
           endpoint: uploadUrl,

@@ -27,14 +27,45 @@ import { AdminDashboard } from "./components/AdminDashboard";
 import { SpreadsheetViewModal } from "./components/SpreadsheetViewModal";
 import { supabase, isRecoveryMode } from "./supabase";
 import { User } from "@supabase/supabase-js";
-import { subscribeToUserProfile, saveUserProfile, subscribeToVitals, saveVitalReading, subscribeToMedications, saveMedication, subscribeToCheckins, saveCheckin, fetchVitalsData } from "./services/db";
+import { subscribeToUserProfile, saveUserProfile, subscribeToVitals, saveVitalReading, subscribeToMedications, saveMedication, deleteMedicationRemote, subscribeToCheckins, saveCheckin, fetchVitalsData } from "./services/db";
 
 import { exportDatabaseToCSV } from './utils/exportDatabase';
 import { Download, Table2 } from 'lucide-react';
 
-import { ChatbotWidget } from "./components/ChatbotWidget";
 import { GuardianMap } from "./components/GuardianMap";
+import { ChatbotWidget } from "./components/ChatbotWidget";
+import { ActiveAlarmModal } from "./components/ActiveAlarmModal";
+import { useMedicationAlarmScheduler } from "./utils/useMedicationAlarmScheduler";
 
+const DEFAULT_MEDICATIONS: Medication[] = [
+  {
+    id: "med-1",
+    name: "Amlodipine",
+    dosage: "5mg",
+    timing: "Morning",
+    takenToday: false,
+    instructions: "After breakfast with water (Blood Pressure)",
+    scheduledTime: "08:00",
+  },
+  {
+    id: "med-2",
+    name: "Metformin",
+    dosage: "500mg",
+    timing: "Afternoon",
+    takenToday: false,
+    instructions: "With lunch (Blood Sugar)",
+    scheduledTime: "13:00",
+  },
+  {
+    id: "med-3",
+    name: "Shelcal 500",
+    dosage: "1 tablet",
+    timing: "Night",
+    takenToday: false,
+    instructions: "After dinner before bedtime (Calcium)",
+    scheduledTime: "21:00",
+  },
+];
 
 const CaretakerDashboard = ({ user, onLogout }) => (
   <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center font-sans p-4 text-center">
@@ -107,8 +138,22 @@ export default function App() {
   const [vitals, setVitals] = useState<VitalReading[]>([]);
   const [vitalsError, setVitalsError] = useState<string | null>(null);
 
-  // Medications State with localStorage persistence
-  const [medications, setMedications] = useState<Medication[]>([]);
+  // Medications State with localStorage persistence & sensible defaults
+  const [medications, setMedications] = useState<Medication[]>(() => {
+    try {
+      const saved = localStorage.getItem("apna_mitra_meds");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn("Failed to load initial meds", e);
+    }
+    return DEFAULT_MEDICATIONS;
+  });
+
+  // Active ringing alarm modal state
+  const [activeAlarmMedication, setActiveAlarmMedication] = useState<Medication | null>(null);
 
   // Family Contacts State (Mapped from userProfile caretakers)
   const [contacts, setContacts] = useState<FamilyContact[]>(() => {
@@ -158,35 +203,25 @@ export default function App() {
           return;
         }
 
-        const role = data?.role?.toLowerCase()?.trim();
+        let role = data?.role?.toLowerCase()?.trim();
         
+        // If profile or role is not yet created, auto-fallback safely to 'patient'
         if (!role || !['patient', 'admin', 'caretaker', 'guardian'].includes(role)) {
-            if (mounted) {
-                setInvalidRole(true);
-                setRoleChecked(true);
-            }
-            isChecking = false;
-            return;
-        }
-
-        const intendedPortal = sessionStorage.getItem('intended_portal');
-        if (intendedPortal) {
-          sessionStorage.removeItem('intended_portal');
-          
-          if (intendedPortal !== role) {
-             // For safety, but allow patient/guardian mismatches to be handled if needed
-             if (intendedPortal !== role && ['patient', 'admin', 'caretaker'].includes(intendedPortal) && ['patient', 'admin', 'caretaker'].includes(role)) {
-                 await supabase.auth.signOut();
-                 sessionStorage.setItem('authError', `This is a ${role} account. Please use the correct login.`);
-                 if (mounted) {
-                     setCurrentUser(null);
-                     setRoleChecked(true);
-                 }
-                 isChecking = false;
-                 return;
-             }
+          role = 'patient';
+          try {
+            await supabase.from('profiles').upsert({
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Patient',
+              role: 'patient'
+            });
+          } catch (profileErr) {
+            console.warn("Could not auto-create profile role:", profileErr);
           }
         }
+
+        // Clean up intended portal session marker without kicking out valid users
+        sessionStorage.removeItem('intended_portal');
 
         if (mounted) {
           setUserRole(role);
@@ -278,7 +313,20 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem("apna_mitra_meds", JSON.stringify(medications));
-  }, [medications]);
+    if (medications && medications.length > 0) {
+      const patientId = currentUser?.id || "anonymous";
+      const tz = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "Asia/Kolkata";
+      fetch("/api/medication-reminders/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient_id: patientId,
+          medications,
+          timezone: tz,
+        }),
+      }).catch((e) => console.warn("Medication schedule sync notice:", e));
+    }
+  }, [medications, currentUser]);
 
   useEffect(() => {
     localStorage.setItem("apna_mitra_checkins", JSON.stringify(checkins));
@@ -395,8 +443,44 @@ export default function App() {
 
   const handleDeleteMedication = (id: string) => {
     setMedications((prev) => prev.filter((m) => m.id !== id));
-    // Ideally delete from Firebase too, but omitting delete functionality from db.ts for brevity.
+    if (currentUser) {
+      deleteMedicationRemote(currentUser.id, id);
+    }
   };
+
+  // Alarm Modal and Scheduler Handlers
+  const handleMarkTakenFromAlarm = (id: string) => {
+    setMedications((prev) => {
+      const updatedList = prev.map((m) => (m.id === id ? { ...m, takenToday: true } : m));
+      const toggledMed = updatedList.find(m => m.id === id);
+      if (currentUser && toggledMed) {
+        saveMedication(currentUser.id, toggledMed);
+      }
+      return updatedList;
+    });
+    setActiveAlarmMedication(null);
+  };
+
+  const handleSnoozeFromAlarm = (id: string, minutes: number = 5) => {
+    const snoozeTime = Date.now() + minutes * 60 * 1000;
+    setMedications((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, snoozedUntil: snoozeTime } : m))
+    );
+    setActiveAlarmMedication(null);
+  };
+
+  const handleDismissAlarm = () => {
+    setActiveAlarmMedication(null);
+  };
+
+  // Automated medication scheduler with audible chime, speech & modal alert
+  useMedicationAlarmScheduler({
+    medications,
+    currentLang,
+    onTriggerAlarm: (med) => {
+      setActiveAlarmMedication(med);
+    },
+  });
 
   const handleSaveCheckin = (checkinData: Omit<DailyCheckin, "id">) => {
     const item: DailyCheckin = {
@@ -592,9 +676,9 @@ export default function App() {
 
       {/* Floating Action Buttons (Accessibility & Quick SOS) */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 print:hidden">
-        {/* AI Health Assistant Chatbot */}
-        <ChatbotWidget />
-        
+        {/* Healthcare AI Chatbot */}
+        <ChatbotWidget currentLang={currentLang} />
+
         {/* Profile / Caretaker Button */}
         <button
           onClick={() => { setRegistrationTab("elderly"); setIsRegistrationOpen(true); }}
@@ -663,13 +747,24 @@ export default function App() {
       {isMedicineReminderOpen && (
         <MedicineReminderModal
           currentLang={currentLang}
-
-
+          userId={currentUser?.id}
           medications={medications}
           onToggleMedication={handleToggleMedication}
           onAddMedication={handleAddMedication}
           onDeleteMedication={handleDeleteMedication}
           onClose={() => setIsMedicineReminderOpen(false)}
+          onTestAlarmNow={(med) => setActiveAlarmMedication(med || medications[0] || DEFAULT_MEDICATIONS[0])}
+        />
+      )}
+
+      {/* Active Audio & Screen Alarm Reminder Modal */}
+      {activeAlarmMedication && (
+        <ActiveAlarmModal
+          medication={activeAlarmMedication}
+          currentLang={currentLang}
+          onMarkTaken={handleMarkTakenFromAlarm}
+          onSnooze={handleSnoozeFromAlarm}
+          onDismiss={handleDismissAlarm}
         />
       )}
 

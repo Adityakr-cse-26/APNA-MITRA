@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { User } from '@supabase/supabase-js';
-import { Building2, User as UserIcon, Calendar, Activity, Search, AlertOctagon, LogOut, Loader2, Sparkles, AlertCircle, Check, Bell, MapPin, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Building2, User as UserIcon, Calendar, Activity, Search, AlertOctagon, LogOut, Loader2, Sparkles, AlertCircle, Check, Bell, MapPin, AlertTriangle, ShieldCheck, MessageSquare } from 'lucide-react';
 
 import { Language } from "../types";
 import { getCurrentLocation } from "../utils/geolocation";
@@ -381,6 +381,22 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
                   </div>
                 </div>
                 <Activity className="w-5 h-5 text-emerald-400/50 group-hover/btn:text-emerald-300 transition-colors" />
+              </button>
+
+              <button 
+                onClick={() => window.dispatchEvent(new CustomEvent('openApnaMitraChat'))}
+                className="w-full flex items-center justify-between bg-white/5 hover:bg-white/15 border border-white/5 hover:border-emerald-400/30 px-5 py-4 rounded-2xl transition-all duration-300 text-left group/btn hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-900/20"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center text-teal-300 group-hover/btn:bg-teal-400 group-hover/btn:text-[#0F2925] transition-colors duration-300">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="block font-bold text-emerald-50 mb-0.5">{currentLang === 'hi' ? 'अपना मित्र AI स्वास्थ्य साथी' : currentLang === 'bn' ? 'আপনা মিত্র এআই স্বাস্থ্য সহকারী' : 'Apna Mitra AI Assistant'}</span>
+                    <span className="block text-xs text-emerald-200/60 font-medium">{currentLang === 'hi' ? 'स्वास्थ्य और कल्याण संबंधी प्रश्न पूछें' : currentLang === 'bn' ? 'স্বাস্থ্য ও সুস্থতা নিয়ে প্রশ্ন জিজ্ঞাসা করুন' : 'Ask health & wellness queries'}</span>
+                  </div>
+                </div>
+                <Sparkles className="w-5 h-5 text-amber-300/80 group-hover/btn:text-amber-200 transition-colors" />
               </button>
               
               <button 

@@ -225,9 +225,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
     setLoading(true);
 
     try {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPassword = password.trim();
+
       if (isLogin) {
+        if (!cleanEmail || !cleanPassword) {
+          setError("Please enter your email and password to sign in.");
+          setLoading(false);
+          return;
+        }
         sessionStorage.setItem('intended_portal', authMode);
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
+          email: cleanEmail, 
+          password: cleanPassword 
+        });
         if (signInError) throw signInError;
         
         if (data.user) {
@@ -235,18 +246,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
         }
       } else {
         const { data, error: signUpError } = await supabase.auth.signUp({
-          email: email,
-          password: password,
+          email: cleanEmail,
+          password: cleanPassword,
           options: {
             data: {
-              full_name: fullName,
-              phone: phone,
-              guardian_name: needsGuardian ? guardianName : null,
-              guardian_phone: needsGuardian ? guardianPhone : null,
+              full_name: fullName.trim(),
+              phone: phone.trim(),
+              guardian_name: needsGuardian ? guardianName.trim() : null,
+              guardian_phone: needsGuardian ? guardianPhone.trim() : null,
               role: authMode,
               dob,
               gender,
-              address
+              address: address.trim()
             }
           }
         });
@@ -264,15 +275,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
 
           const profilePayload: any = {
             id: data.user.id,
-            full_name: fullName,
-            email: email,
-            phone: phone,
+            full_name: fullName.trim(),
+            email: cleanEmail,
+            phone: phone.trim(),
             role: authMode
           };
           
           if (authMode === 'patient' && needsGuardian) {
-            profilePayload.guardian_name = guardianName;
-            profilePayload.guardian_phone = guardianPhone;
+            profilePayload.guardian_name = guardianName.trim();
+            profilePayload.guardian_phone = guardianPhone.trim();
           }
 
           const { error: profileError } = await supabase.from("profiles").upsert(profilePayload);
@@ -284,7 +295,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
           }
 
           if (needsGuardian && (guardianName || guardianPhone)) {
-            const { error: caretakerError } = await supabase.from('caretakers').upsert({ patient_id: data.user.id, name: guardianName, phone: guardianPhone });
+            const { error: caretakerError } = await supabase.from('caretakers').upsert({ patient_id: data.user.id, name: guardianName.trim(), phone: guardianPhone.trim() });
             if (caretakerError) {
               console.error("Caretaker creation error:", caretakerError);
               if (caretakerError.code === '42501' || caretakerError.message.includes('row-level security')) {
@@ -293,7 +304,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
             }
           }
           
-          setSuccessMessage("Registration successful! Please verify your email before logging in.");
+          setSuccessMessage("Registration successful! You can now log in with your credentials.");
           setIsLogin(true);
           setPassword('');
           setConfirmPassword('');
@@ -311,9 +322,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
       } else if (err.message === "Email not confirmed") {
         errorMsg = "Email not confirmed. Please check your inbox for the confirmation link. For testing, you can turn OFF 'Confirm email' in Supabase Dashboard -> Authentication -> Providers -> Email.";
       } else if (err.message === "Invalid login credentials") {
-        errorMsg = "Invalid login credentials. If you just registered, you may need to confirm your email first. To disable this for testing: Go to Supabase Dashboard -> Authentication -> Providers -> Email -> turn OFF 'Confirm email'.";
+        errorMsg = "Invalid email or password. Please verify your credentials, reset your password, or explore the app in Demo Mode.";
       } else if (err.message.includes("Database error")) {
-         errorMsg = "Database Error: Your Supabase database is either paused, full, or has a failing trigger (e.g. missing 'profiles' table). Click 'Skip Login' below to use a Demo Account for now, or run the provided SQL schema in your Supabase SQL Editor.";
+         errorMsg = "Database Error: Your Supabase database is either paused, full, or has a failing trigger (e.g. missing 'profiles' table). Click 'Explore in Demo Mode' below to use a Demo Account for now.";
       }
       
       setError(errorMsg);
@@ -324,7 +335,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
       setError("Please enter your email address to reset password.");
       return;
     }
@@ -333,7 +345,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
     setResetSent(false);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: `${window.location.origin}/reset-password` });
       if (error) throw error;
       setResetSent(true);
     } catch (err: any) {
@@ -469,14 +481,25 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
         </div>
 
         <div className="p-8">
-          {authMode !== 'admin' && (
+          {authMode !== 'admin' ? (
             <div className="flex bg-gray-100 p-1 rounded-xl mb-6">
-              <button onClick={() => { setAuthMode('patient'); setIsLogin(true); setError(null); }} className={`flex-1 text-sm font-bold transition py-2 px-3 rounded-lg ${authMode === 'patient' && isLogin ? 'bg-white shadow-sm text-emerald-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}>
+              <button 
+                onClick={() => { setAuthMode('patient'); setIsLogin(true); setError(null); setIsReset(false); }} 
+                className={`flex-1 text-sm font-bold transition py-2 px-3 rounded-lg ${authMode === 'patient' && isLogin && !isReset ? 'bg-white shadow-sm text-emerald-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
+              >
                 Patient Login
               </button>
-              <button onClick={() => { setAuthMode('patient'); setIsLogin(false); setError(null); }} className={`flex-1 text-sm font-bold transition py-2 px-3 rounded-lg ${authMode === 'patient' && !isLogin ? 'bg-white shadow-sm text-emerald-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}>
+              <button 
+                onClick={() => { setAuthMode('patient'); setIsLogin(false); setError(null); setIsReset(false); }} 
+                className={`flex-1 text-sm font-bold transition py-2 px-3 rounded-lg ${authMode === 'patient' && !isLogin && !isReset ? 'bg-white shadow-sm text-emerald-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
+              >
                 Patient Registration
               </button>
+            </div>
+          ) : (
+            <div className="mb-6 p-2.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-semibold text-center flex items-center justify-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-amber-700" />
+              <span>Administrator Secure Portal</span>
             </div>
           )}
           <h2 className="text-2xl font-bold text-[#153A34] mb-6 text-center">
@@ -494,9 +517,50 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
             </div>
           )}
           {error && (
-            <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-start gap-3 text-sm">
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
+                <div className="flex-1">
+                  <p className="font-semibold text-rose-900">
+                    {error.includes("Invalid") ? "Login Failed" : "Authentication Notice"}
+                  </p>
+                  <p className="mt-1 text-rose-700 text-xs sm:text-sm leading-relaxed">{error}</p>
+                  
+                  {isLogin && !isReset && (
+                    <div className="mt-3 pt-3 border-t border-rose-200/80 flex flex-wrap gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setIsReset(true);
+                        }}
+                        className="px-2.5 py-1.5 bg-white border border-rose-300 rounded-lg text-rose-800 font-semibold hover:bg-rose-100 transition shadow-xs cursor-pointer"
+                      >
+                        Reset Password
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setIsLogin(false);
+                        }}
+                        className="px-2.5 py-1.5 bg-white border border-rose-300 rounded-lg text-rose-800 font-semibold hover:bg-rose-100 transition shadow-xs cursor-pointer"
+                      >
+                        Create Account
+                      </button>
+                      {onGuestLogin && (
+                        <button
+                          type="button"
+                          onClick={onGuestLogin}
+                          className="px-2.5 py-1.5 bg-emerald-700 text-white rounded-lg font-semibold hover:bg-emerald-800 transition shadow-xs cursor-pointer"
+                        >
+                          Explore Demo Mode
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           
@@ -590,9 +654,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
                       <button
                         type="button"
                         onClick={() => {
-                          window.location.href = '/forgot-password';
+                          setError(null);
+                          setIsReset(true);
                         }}
-                        className="text-sm text-gray-500 hover:text-gray-700 hover:underline font-medium transition-colors"
+                        className="text-sm text-gray-500 hover:text-emerald-700 hover:underline font-medium transition-colors"
                       >
                         Forgot password?
                       </button>
@@ -658,11 +723,37 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 mt-4"
+              className="w-full py-3.5 px-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer"
             >
               <ShieldCheck className="w-5 h-5" />
               {loading ? 'Please wait...' : isReset ? 'Send Reset Link' : isLogin ? 'Secure Sign In' : 'Register / Sign Up'}
             </button>
+
+            {isReset && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsReset(false);
+                  setError(null);
+                }}
+                className="w-full mt-3 py-2 text-sm font-semibold text-gray-600 hover:text-emerald-800 transition text-center cursor-pointer"
+              >
+                ← Back to Sign In
+              </button>
+            )}
+
+            {isLogin && !isReset && onGuestLogin && (
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={onGuestLogin}
+                  className="w-full py-3 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl border border-emerald-200 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer shadow-xs"
+                >
+                  <User className="w-4 h-4 text-emerald-700" />
+                  <span>{currentLang === 'hi' ? 'डेमो मोड में ऐप देखें (लॉगिन छोड़ें)' : currentLang === 'bn' ? 'ডেমো মোডে দেখুন (লগইন এড়িয়ে যান)' : 'Explore in Demo Mode (Skip Login)'}</span>
+                </button>
+              </div>
+            )}
           </form>
 
           <div className="mt-8 text-center border-t border-gray-100 pt-6">

@@ -168,7 +168,7 @@ export const subscribeToVitals = (userId: string, callback: (vitals: VitalReadin
       const data = await fetchVitalsData(userId);
       if (isMounted) callback(data);
     } catch(e) {
-      console.error(e);
+      console.warn("Notice loading vitals:", e);
     }
   };
   
@@ -218,25 +218,40 @@ export const saveVitalReading = async (userId: string, vital: VitalReading) => {
 export const subscribeToMedications = (userId: string, callback: (medications: Medication[]) => void) => {
   let isMounted = true;
   const fetchMeds = async () => {
-    const { data, error } = await supabase
-      .from('medications')
-      .select('*')
-      .eq('patient_id', userId);
-      
-    if (!error && data && isMounted) {
-      callback(data.map(d => ({
-        id: d.id,
-        name: d.name,
-        dosage: d.dosage,
-        timing: d.timing,
-        takenToday: d.taken_today || false,
-        instructions: d.instructions,
-        scheduledTime: d.scheduled_time,
-        remainingPills: d.remaining_pills,
-        totalPills: d.total_pills,
-        critical: d.critical,
-        snoozedUntil: d.snoozed_until
-      }) as Medication));
+    try {
+      const { data, error } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('patient_id', userId);
+        
+      if (!error && data && isMounted) {
+        callback(data.map(d => ({
+          id: d.id,
+          name: d.name,
+          dosage: d.dosage,
+          timing: d.timing,
+          takenToday: d.taken_today || false,
+          instructions: d.instructions,
+          scheduledTime: d.scheduled_time,
+          remainingPills: d.remaining_pills,
+          totalPills: d.total_pills,
+          critical: d.critical,
+          snoozedUntil: d.snoozed_until
+        }) as Medication));
+        return;
+      }
+      if (error) throw error;
+    } catch (err: any) {
+      console.warn("Medications remote query notice:", err?.message || err);
+      try {
+        const key = `apna_mitra_meds_${userId}`;
+        const local = localStorage.getItem(key);
+        if (local && isMounted) {
+          callback(JSON.parse(local));
+        }
+      } catch (e) {
+        console.warn("Meds local fallback error:", e);
+      }
     }
   };
   fetchMeds();
@@ -244,6 +259,21 @@ export const subscribeToMedications = (userId: string, callback: (medications: M
 };
 
 export const saveMedication = async (userId: string, medication: Medication) => {
+  try {
+    const key = `apna_mitra_meds_${userId}`;
+    const local = localStorage.getItem(key);
+    let list: Medication[] = local ? JSON.parse(local) : [];
+    const idx = list.findIndex(m => m.id === medication.id);
+    if (idx >= 0) {
+      list[idx] = medication;
+    } else {
+      list.push(medication);
+    }
+    localStorage.setItem(key, JSON.stringify(list));
+  } catch (e) {
+    console.warn("Meds local save error:", e);
+  }
+
   try {
     const { error } = await supabase
       .from('medications')
@@ -261,29 +291,70 @@ export const saveMedication = async (userId: string, medication: Medication) => 
         critical: medication.critical,
         snoozed_until: medication.snoozedUntil
       });
-    if (error) throw error;
+    if (error) console.warn("Remote saveMedication notice:", error.message || error);
   } catch (error) {
-    console.error("Failed to save medication:", error);
+    console.warn("Failed to save medication remotely:", error);
+  }
+};
+
+export const deleteMedicationRemote = async (userId: string, medicationId: string) => {
+  try {
+    const key = `apna_mitra_meds_${userId}`;
+    const local = localStorage.getItem(key);
+    if (local) {
+      const list: Medication[] = JSON.parse(local);
+      localStorage.setItem(key, JSON.stringify(list.filter(m => m.id !== medicationId)));
+    }
+  } catch (e) {
+    console.warn("Meds local delete error:", e);
+  }
+
+  try {
+    if (!medicationId.startsWith('m-')) {
+      const { error } = await supabase
+        .from('medications')
+        .delete()
+        .eq('id', medicationId)
+        .eq('patient_id', userId);
+      if (error) console.warn("Remote deleteMedication notice:", error.message || error);
+    }
+  } catch (error) {
+    console.warn("Failed to delete medication remotely:", error);
   }
 };
 
 export const subscribeToCheckins = (userId: string, callback: (checkins: DailyCheckin[]) => void) => {
   let isMounted = true;
   const fetchCheckins = async () => {
-    const { data, error } = await supabase
-      .from('daily_checkins')
-      .select('*')
-      .eq('patient_id', userId)
-      .order('appointment_date', { ascending: false });
-      
-    if (!error && data && isMounted) {
-      callback(data.map(d => ({
-        id: d.id,
-        date: d.appointment_date,
-        mood: d.mood,
-        symptoms: d.symptoms || [],
-        notes: d.notes
-      }) as DailyCheckin));
+    try {
+      const { data, error } = await supabase
+        .from('daily_checkins')
+        .select('*')
+        .eq('patient_id', userId)
+        .order('appointment_date', { ascending: false });
+        
+      if (!error && data && isMounted) {
+        callback(data.map(d => ({
+          id: d.id,
+          date: d.appointment_date,
+          mood: d.mood,
+          symptoms: d.symptoms || [],
+          notes: d.notes
+        }) as DailyCheckin));
+        return;
+      }
+      if (error) throw error;
+    } catch (err: any) {
+      console.warn("Daily checkins remote query notice:", err?.message || err);
+      try {
+        const key = `apna_mitra_checkins_${userId}`;
+        const local = localStorage.getItem(key);
+        if (local && isMounted) {
+          callback(JSON.parse(local));
+        }
+      } catch (e) {
+        console.warn("Checkins local fallback error:", e);
+      }
     }
   };
   fetchCheckins();
@@ -291,6 +362,15 @@ export const subscribeToCheckins = (userId: string, callback: (checkins: DailyCh
 };
 
 export const saveCheckin = async (userId: string, checkin: DailyCheckin) => {
+  try {
+    const key = `apna_mitra_checkins_${userId}`;
+    const local = localStorage.getItem(key);
+    const list = local ? JSON.parse(local) : [];
+    localStorage.setItem(key, JSON.stringify([checkin, ...list]));
+  } catch (e) {
+    console.warn("Checkins local save error:", e);
+  }
+
   try {
     const { error } = await supabase
       .from('daily_checkins')
@@ -301,9 +381,9 @@ export const saveCheckin = async (userId: string, checkin: DailyCheckin) => {
         symptoms: checkin.symptoms,
         notes: checkin.notes
       }]);
-    if (error) throw error;
+    if (error) console.warn("Remote saveCheckin notice:", error.message || error);
   } catch (error) {
-    console.error("Failed to save checkin:", error);
+    console.warn("Failed to save checkin remotely:", error);
   }
 };
 
@@ -403,9 +483,9 @@ export const fetchDoctors = async () => {
   try {
     const { data, error } = await supabase.from('doctors').select('*').order('name');
     if (error) throw error;
-    return data as Doctor[];
-  } catch (error) {
-    console.error("Fetch doctors error:", error);
+    return (data || []) as Doctor[];
+  } catch (error: any) {
+    console.warn("Fetch doctors notice:", error?.message || error);
     return [];
   }
 };
@@ -535,7 +615,7 @@ export const saveGameResult = async (result: GameResult) => {
 
 export const fetchUserPoints = async (userId: string) => {
   try {
-    const { data, error } = await supabase.from('user_points').select('*').eq('user_id', userId).single();
+    const { data, error } = await supabase.from('user_points').select('*').eq('user_id', userId).maybeSingle();
     if (error && error.code !== 'PGRST116') throw error; // PGRST116 is no rows returned
     
     if (!data) {
@@ -547,14 +627,24 @@ export const fetchUserPoints = async (userId: string) => {
          games_completed: 0,
          daily_streak: 0,
        };
-       await supabase.from('user_points').insert([initial]);
+       try {
+         await supabase.from('user_points').insert([initial]);
+       } catch (insertErr) {
+         console.warn("Could not insert initial points:", insertErr);
+       }
        return initial;
     }
     
     return data as UserPoints;
-  } catch (error) {
-    console.error("Fetch user points error:", error);
-    return null;
+  } catch (error: any) {
+    console.warn("Fetch user points notice:", error?.message || error);
+    return {
+      user_id: userId,
+      total_points: 0,
+      current_level: 'Bronze',
+      games_completed: 0,
+      daily_streak: 0,
+    };
   }
 };
 
@@ -617,6 +707,7 @@ export const fetchRecentGameResults = async (userId: string) => {
 export const savePushSubscription = async (userId: string, subscription: PushSubscription) => {
   try {
     const subJSON = subscription.toJSON();
+    const userTimezone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
     
     // Find the primary caretaker for this patient
     const { data: primaryCaretaker } = await supabase
@@ -638,6 +729,7 @@ export const savePushSubscription = async (userId: string, subscription: PushSub
       caretakerId = firstCaretaker?.id;
     }
 
+    // Try upserting with timezone and reminders_enabled
     const { error } = await supabase
       .from('push_subscriptions')
       .upsert({
@@ -646,12 +738,60 @@ export const savePushSubscription = async (userId: string, subscription: PushSub
         endpoint: subJSON.endpoint,
         p256dh: subJSON.keys?.p256dh,
         auth: subJSON.keys?.auth,
+        timezone: userTimezone,
+        reminders_enabled: true,
+        updated_at: new Date().toISOString()
       }, { onConflict: 'endpoint' });
       
-    if (error) throw error;
+    if (error) {
+      // Fallback in case table doesn't have custom columns yet
+      console.warn("Save push subscription with timezone warning, retrying baseline:", error.message);
+      const { error: fallbackError } = await supabase
+        .from('push_subscriptions')
+        .upsert({
+          patient_uid: userId,
+          caretaker_id: caretakerId || null,
+          endpoint: subJSON.endpoint,
+          p256dh: subJSON.keys?.p256dh,
+          auth: subJSON.keys?.auth,
+        }, { onConflict: 'endpoint' });
+      if (fallbackError) throw fallbackError;
+    }
   } catch (error) {
     console.error("Save Push Subscription Error:", error);
     throw error;
+  }
+};
+
+export const updateRemindersEnabled = async (userId: string, enabled: boolean) => {
+  try {
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .update({ reminders_enabled: enabled, updated_at: new Date().toISOString() })
+      .eq('patient_uid', userId);
+    if (error) console.warn("Update reminders_enabled notice:", error.message);
+  } catch (err) {
+    console.warn("Update reminders error:", err);
+  }
+};
+
+export const getPatientReminderSettings = async (userId: string): Promise<{ remindersEnabled: boolean; hasSubscription: boolean }> => {
+  try {
+    const { data, error } = await supabase
+      .from('push_subscriptions')
+      .select('reminders_enabled')
+      .eq('patient_uid', userId)
+      .limit(1);
+
+    if (!error && data && data.length > 0) {
+      return {
+        remindersEnabled: data[0].reminders_enabled !== false,
+        hasSubscription: true,
+      };
+    }
+    return { remindersEnabled: true, hasSubscription: false };
+  } catch {
+    return { remindersEnabled: true, hasSubscription: false };
   }
 };
 
@@ -682,7 +822,7 @@ export const fetchVitalsData = async (userId: string): Promise<VitalReading[]> =
     if (error) throw error;
     if (!data) return [];
     
-    return data.map(d => ({
+    const vitals = data.map(d => ({
       id: d.id,
       type: d.type,
       value: d.value,
@@ -691,18 +831,24 @@ export const fetchVitalsData = async (userId: string): Promise<VitalReading[]> =
       status: d.status,
       note: d.note
     }) as VitalReading);
-  } catch (error: any) {
-    if (error?.code === 'PGRST205' || error?.code === 'PGRST116' || error?.code === '42703' || error?.message?.includes('schema cache') || error?.message?.includes('Failed to fetch')) {
-      console.warn("Vitals table not found. Using local storage fallback.");
-      try {
-        const key = `apna_mitra_vitals_${userId}`;
-        const existing = localStorage.getItem(key);
-        return existing ? JSON.parse(existing) : [];
-      } catch(e) {
-        return [];
-      }
+
+    // Synchronize to local storage cache for offline availability
+    try {
+      const key = `apna_mitra_vitals_${userId}`;
+      localStorage.setItem(key, JSON.stringify(vitals));
+    } catch {
+      // ignore
     }
-    console.error("Failed to fetch vitals:", error);
-    throw error;
+
+    return vitals;
+  } catch (error: any) {
+    console.warn("Vitals fetch remote notice, using local cache:", error?.message || error);
+    try {
+      const key = `apna_mitra_vitals_${userId}`;
+      const existing = localStorage.getItem(key);
+      return existing ? JSON.parse(existing) : [];
+    } catch {
+      return [];
+    }
   }
 };
