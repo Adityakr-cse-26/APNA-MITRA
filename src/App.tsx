@@ -95,13 +95,32 @@ export default function App() {
     const saved = localStorage.getItem("apna_mitra_profile");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (!parsed.patientId || !/^AM-UID-\d{4}-\d{4}$/.test(parsed.patientId)) {
+          parsed.patientId = "AM-UID-2026-3210";
+        }
+        if (!parsed.dob) {
+          parsed.dob = "1954-05-15";
+        }
+        if (!parsed.photo_url) {
+          const storedPhoto = localStorage.getItem(`apna_mitra_patient_photo_${parsed.id}`) ||
+                              localStorage.getItem(`apna_mitra_patient_photo_${parsed.patientId}`) ||
+                              localStorage.getItem('apna_mitra_patient_photo_usr-1') ||
+                              localStorage.getItem('apna_mitra_patient_photo_current');
+          if (storedPhoto) {
+            parsed.photo_url = storedPhoto;
+            parsed.avatar_url = storedPhoto;
+          }
+        }
+        return parsed;
       } catch (e) {}
     }
     return {
       id: "usr-1",
+      patientId: "AM-UID-2026-3210",
       name: "Ram Prakash Sharma",
       age: 72,
+      dob: "1954-05-15",
       gender: "male",
       phone: "+91 98765 43210",
       address: "B-42, Gulmohar Park, New Delhi",
@@ -307,6 +326,21 @@ export default function App() {
     );
   }, [userProfile]);
 
+  // Keep userProfile in sync with patient photo uploads
+  useEffect(() => {
+    const handlePhotoUpdated = (e: any) => {
+      if (e.detail !== undefined) {
+        setUserProfile(prev => ({
+          ...prev,
+          photo_url: e.detail || undefined,
+          avatar_url: e.detail || undefined
+        }));
+      }
+    };
+    window.addEventListener('patientPhotoUpdated', handlePhotoUpdated);
+    return () => window.removeEventListener('patientPhotoUpdated', handlePhotoUpdated);
+  }, []);
+
   useEffect(() => {
     localStorage.setItem("apna_mitra_vitals", JSON.stringify(vitals));
   }, [vitals]);
@@ -314,19 +348,22 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("apna_mitra_meds", JSON.stringify(medications));
     if (medications && medications.length > 0) {
-      const patientId = currentUser?.id || "anonymous";
+      const patientId = userProfile?.patientId || currentUser?.id || "anonymous";
       const tz = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "Asia/Kolkata";
       fetch("/api/medication-reminders/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           patient_id: patientId,
+          patient_name: userProfile?.name,
+          patient_phone: userProfile?.phone,
+          sms_enabled: userProfile?.smsRemindersEnabled !== false,
           medications,
-          timezone: tz,
+          timezone: tz || "Asia/Kolkata",
         }),
       }).catch((e) => console.warn("Medication schedule sync notice:", e));
     }
-  }, [medications, currentUser]);
+  }, [medications, currentUser, userProfile]);
 
   useEffect(() => {
     localStorage.setItem("apna_mitra_checkins", JSON.stringify(checkins));
@@ -375,6 +412,25 @@ export default function App() {
 
   const handleSaveProfile = async (updated: ElderlyProfile) => {
     setUserProfile(updated);
+    localStorage.setItem("apna_mitra_profile", JSON.stringify(updated));
+
+    // Sync with server store so SMS & SOS services always have the freshest emergency phone
+    try {
+      const primaryPhone = (updated.emergency_contact_phone || updated.guardian_phone || updated.caretakers?.find(c => c.isPrimary)?.phone || updated.caretakers?.[0]?.phone || '').trim();
+      await fetch('/api/medications/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: currentUser?.id || updated.patientId || 'patient',
+          patient_name: updated.name,
+          patient_phone: updated.phone,
+          caretaker_phone: primaryPhone,
+          sms_enabled: true,
+          medications: []
+        })
+      });
+    } catch (_) {}
+
     if (currentUser) {
       const { saveUserProfile, subscribeToUserProfile, savePushSubscription } = await import('./services/db');
       await saveUserProfile(currentUser.id, updated);
@@ -385,7 +441,11 @@ export default function App() {
       });
       
       if ((window as any).__pendingPushSubscription) {
-        await savePushSubscription(currentUser.id, (window as any).__pendingPushSubscription);
+        try {
+          await savePushSubscription(currentUser.id, (window as any).__pendingPushSubscription);
+        } catch (pushErr) {
+          console.warn("Push subscription sync non-blocking notice:", pushErr);
+        }
         (window as any).__pendingPushSubscription = null;
       }
     }
@@ -608,14 +668,14 @@ export default function App() {
       {/* Main Content Sections */}
       <main className="flex-1">
         
-        <PatientDashboardView onOpenMedicineReminder={() => setIsMedicineReminderOpen(true)}
+        <PatientDashboardView 
+          onOpenMedicineReminder={() => setIsMedicineReminderOpen(true)}
           onOpenProfile={() => { setRegistrationTab("elderly"); setIsRegistrationOpen(true); }} 
           user={effectiveUser} 
           onLogout={handleLogout}
           onOpenSymptomChecker={() => setIsSymptomCheckerOpen(true)}
-         currentLang={currentLang}
-
-
+          currentLang={currentLang}
+          profileProp={userProfile}
         />
         
         {/* FLOWCHART MODULE 2: CARE & HEALTH DASHBOARD */}
@@ -748,6 +808,7 @@ export default function App() {
         <MedicineReminderModal
           currentLang={currentLang}
           userId={currentUser?.id}
+          profile={userProfile}
           medications={medications}
           onToggleMedication={handleToggleMedication}
           onAddMedication={handleAddMedication}

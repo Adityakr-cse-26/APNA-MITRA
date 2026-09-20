@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { User } from '@supabase/supabase-js';
-import { Building2, User as UserIcon, Calendar, Activity, Search, AlertOctagon, LogOut, Loader2, Sparkles, AlertCircle, Check, Bell, MapPin, AlertTriangle, ShieldCheck, MessageSquare } from 'lucide-react';
+import { Building2, User as UserIcon, Calendar, Activity, Search, AlertOctagon, LogOut, Loader2, Sparkles, AlertCircle, Check, Bell, MapPin, AlertTriangle, ShieldCheck, MessageSquare, Phone, Camera, Upload, Eye, Trash2, X, Download, Image as ImageIcon } from 'lucide-react';
 
-import { Language } from "../types";
+import { Language, ElderlyProfile } from "../types";
 import { getCurrentLocation } from "../utils/geolocation";
+import { triggerEmergencySOS } from "../services/emergencyService";
 interface PatientDashboardProps {
   currentLang: Language;
   user: User;
@@ -12,9 +13,10 @@ interface PatientDashboardProps {
   onOpenSymptomChecker: () => void;
   onOpenMedicineReminder: () => void;
   onOpenProfile?: () => void;
+  profileProp?: ElderlyProfile;
 }
 
-export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, onLogout, onOpenSymptomChecker, onOpenMedicineReminder, currentLang, onOpenProfile }) => {
+export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, onLogout, onOpenSymptomChecker, onOpenMedicineReminder, currentLang, onOpenProfile, profileProp }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -35,6 +37,131 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
 
 
   const [notifications, setNotifications] = useState<any[]>([]);
+
+  // Patient Passport Photo States
+  const [patientPhoto, setPatientPhoto] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(`apna_mitra_patient_photo_${user.id}`) || null;
+    } catch {
+      return null;
+    }
+  });
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoFeedback, setPhotoFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showPhotoPreviewModal, setShowPhotoPreviewModal] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Sync photo with window event if updated anywhere
+  useEffect(() => {
+    const handlePhotoUpdated = (e: any) => {
+      if (e.detail !== undefined) {
+        setPatientPhoto(e.detail);
+      }
+    };
+    window.addEventListener('patientPhotoUpdated', handlePhotoUpdated);
+    return () => window.removeEventListener('patientPhotoUpdated', handlePhotoUpdated);
+  }, []);
+
+  const handlePhotoFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setPhotoFeedback({ type: 'error', text: 'Please select a valid image file (JPG, PNG, or WebP).' });
+      return;
+    }
+    
+    if (file.size > 12 * 1024 * 1024) {
+      setPhotoFeedback({ type: 'error', text: 'Image size too large. Please select a photo under 12MB.' });
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setPhotoFeedback(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        // Standard passport size ratio is 35mm : 45mm = 7:9 = 0.777
+        // High resolution passport canvas: 350px width by 450px height
+        const targetWidth = 350;
+        const targetHeight = 450;
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          setIsUploadingPhoto(false);
+          setPhotoFeedback({ type: 'error', text: 'Could not process photo on this device.' });
+          return;
+        }
+
+        // Center-crop to standard 35:45 passport photo ratio
+        const imgAspect = img.width / img.height;
+        const targetAspect = targetWidth / targetHeight;
+
+        let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
+
+        if (imgAspect > targetAspect) {
+          // Wider than target: crop left and right
+          srcW = img.height * targetAspect;
+          srcX = (img.width - srcW) / 2;
+        } else {
+          // Taller than target: crop top and bottom
+          srcH = img.width / targetAspect;
+          srcY = (img.height - srcH) / 2;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, targetWidth, targetHeight);
+
+        // Convert to high quality JPEG data URL
+        const photoDataUrl = canvas.toDataURL('image/jpeg', 0.90);
+
+        // 1. Update local state
+        setPatientPhoto(photoDataUrl);
+
+        // 2. Update localStorage
+        try {
+          localStorage.setItem(`apna_mitra_patient_photo_${user.id}`, photoDataUrl);
+          if (profileProp?.id) localStorage.setItem(`apna_mitra_patient_photo_${profileProp.id}`, photoDataUrl);
+          if (profileProp?.patientId) localStorage.setItem(`apna_mitra_patient_photo_${profileProp.patientId}`, photoDataUrl);
+          localStorage.setItem('apna_mitra_patient_photo_current', photoDataUrl);
+        } catch {}
+
+        // Dispatch global event so all components update seamlessly
+        window.dispatchEvent(new CustomEvent('patientPhotoUpdated', { detail: photoDataUrl }));
+
+        setIsUploadingPhoto(false);
+        setPhotoFeedback({ type: 'success', text: currentLang === 'hi' ? 'पासपोर्ट साइज फोटो सफलतापूर्वक सहेजी गई! (35×45mm)' : currentLang === 'bn' ? 'পাসপোর্ট সাইজ ছবি সফলভাবে সংরক্ষিত হয়েছে! (35×45mm)' : 'Passport size photo saved successfully! (35×45mm)' });
+        setTimeout(() => setPhotoFeedback(null), 4000);
+      };
+      img.onerror = () => {
+        setIsUploadingPhoto(false);
+        setPhotoFeedback({ type: 'error', text: 'Failed to process image. Please try another photo.' });
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => {
+      setIsUploadingPhoto(false);
+      setPhotoFeedback({ type: 'error', text: 'Failed to read file.' });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = async () => {
+    setPatientPhoto(null);
+    try {
+      localStorage.removeItem(`apna_mitra_patient_photo_${user.id}`);
+      if (profileProp?.id) localStorage.removeItem(`apna_mitra_patient_photo_${profileProp.id}`);
+      if (profileProp?.patientId) localStorage.removeItem(`apna_mitra_patient_photo_${profileProp.patientId}`);
+      localStorage.removeItem('apna_mitra_patient_photo_current');
+    } catch {}
+
+    window.dispatchEvent(new CustomEvent('patientPhotoUpdated', { detail: null }));
+    setPhotoFeedback({ type: 'success', text: currentLang === 'hi' ? 'पासपोर्ट फोटो हटा दी गई' : currentLang === 'bn' ? 'পাসপোর্ট ছবি মুছে ফেলা হয়েছে' : 'Passport photo removed.' });
+    setTimeout(() => setPhotoFeedback(null), 3000);
+  };
 
   // SOS States
   const [showSosConfirm, setShowSosConfirm] = useState(false);
@@ -80,37 +207,64 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
     };
   }, [user]);
 
+  // Synchronize profile changes instantly if passed via props
+  useEffect(() => {
+    if (profileProp) {
+      const gPhone = profileProp.emergency_contact_phone || profileProp.guardian_phone;
+      const gName = profileProp.emergency_contact_name || profileProp.guardian_name;
+      const gRel = profileProp.emergency_contact_relationship || profileProp.guardian_relation;
+      if (gPhone) {
+        setPrimaryCaretaker((prev: any) => ({
+          ...prev,
+          name: gName || prev?.name || 'Primary Contact',
+          phone: gPhone,
+          relation: gRel || prev?.relation || 'Guardian',
+          is_primary: true
+        }));
+      }
+    }
+  }, [profileProp]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
       
       // 1. Fetch Profile
-      
       const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-
-        
       if (profileError) throw profileError;
       setProfile(profileData || { full_name: user.user_metadata?.full_name || 'Patient' });
 
-      // Fetch Primary Caretaker
+      const remotePhoto = profileData?.photo_url || profileData?.avatar_url || profileProp?.photo_url || profileProp?.avatar_url;
+      if (remotePhoto) {
+        setPatientPhoto(remotePhoto);
+        try {
+          localStorage.setItem(`apna_mitra_patient_photo_${user.id}`, remotePhoto);
+        } catch {}
+      }
+
+      // Fetch Caretakers - look for is_primary first
       const { data: caretakersData } = await supabase
         .from('caretakers')
         .select('*')
         .eq('patient_id', user.id)
-        .order('created_at', { ascending: true }) // First created caretaker
-        .limit(1);
+        .order('is_primary', { ascending: false });
       
-      if (caretakersData && caretakersData.length > 0) {
-        setPrimaryCaretaker(caretakersData.find((c: any) => c.is_primary) || caretakersData[0]);
-      } else {
-        // Fallback to profile's emergency contact if no caretaker is in the caretakers table
-        if (profileData && profileData.emergency_contact_name && profileData.emergency_contact_phone) {
-           setPrimaryCaretaker({
-             name: profileData.emergency_contact_name,
-             phone: profileData.emergency_contact_phone
-           });
-        }
+      const chosen = caretakersData?.find((c: any) => c.is_primary) || caretakersData?.[0];
+      const effectiveName = profileData?.emergency_contact_name || profileData?.guardian_name || chosen?.name || profileProp?.emergency_contact_name || '';
+      const effectivePhone = profileData?.emergency_contact_phone || profileData?.guardian_phone || chosen?.phone || profileProp?.emergency_contact_phone || '';
+      const effectiveRel = profileData?.emergency_contact_relationship || profileData?.guardian_relation || chosen?.relation || 'Primary Contact';
+
+      if (effectivePhone) {
+        setPrimaryCaretaker({
+          id: chosen?.id,
+          name: effectiveName || 'Primary Contact',
+          phone: effectivePhone,
+          relation: effectiveRel,
+          is_primary: true
+        });
+      } else if (chosen) {
+        setPrimaryCaretaker(chosen);
       }
       
       // Fetch Notifications
@@ -126,12 +280,8 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
       }
 
       // 2. Fetch Appointments
-      
       const { data: appointmentsData, error: apptError } = await supabase.from('appointments').select('*').eq('patient_id', user.id).order('appointment_date', { ascending: true });
-
-        
       if (apptError && apptError.code !== '42P01') {
-         // ignore relation doesn't exist error if it's a new setup
          console.warn("Appointments fetch error:", apptError);
       }
       
@@ -142,10 +292,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
       }
 
       // 3. Fetch Health Checks
-      
       const { data: checksData, error: checksError } = await supabase.from('health_checks').select('*').eq('patient_id', user.id).order('created_at', { ascending: false });
-
-        
       if (checksError && checksError.code !== '42P01') {
         console.warn("Health checks fetch error:", checksError);
       }
@@ -161,7 +308,8 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
 
   const handleSOS = () => {
     console.log("SOS button clicked");
-    if (!primaryCaretaker || !primaryCaretaker.name || !primaryCaretaker.phone) {
+    const activePhone = primaryCaretaker?.phone || profile?.emergency_contact_phone || profile?.guardian_phone || profileProp?.emergency_contact_phone || profileProp?.guardian_phone;
+    if (!activePhone) {
       alert("Please add an emergency contact before using SOS.");
       return;
     }
@@ -173,13 +321,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
   const confirmSOS = async () => {
     setSosStatus('loading');
     
-    if (!primaryCaretaker || !primaryCaretaker.name || !primaryCaretaker.phone) {
-      setSosStatus('error');
-      setSosMessage("Please add an emergency contact before using SOS.");
-      return;
-    }
-    
-    console.log("User found:", user.id);
+    // Play audio siren
     import("../utils/audio").then((m) => {
         if (m.playSiren) m.playSiren();
     }).catch(() => {});
@@ -191,67 +333,33 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
     } catch(e) {
       console.warn("Could not get location", e);
     }
-    
+
     try {
-      const { data: alertData, error: insertError } = await supabase.from('emergency_alerts').insert([{
-        patient_id: user.id,
-        emergency_contact_name: primaryCaretaker.name,
-        emergency_contact_phone: primaryCaretaker.phone,
-        emergency_contact_relationship: primaryCaretaker.relation || primaryCaretaker.relationship || 'Primary Contact',
-        alert_type: "SOS",
-        status: "created",
-        notification_status: "pending",
-        location_lat: loc ? loc.latitude : null,
-        location_lng: loc ? loc.longitude : null,
-        location_accuracy: loc ? loc.accuracy : null,
-        location_timestamp: loc ? loc.timestamp : null
-      }]).select('id').single();
+      const result = await triggerEmergencySOS({
+        userId: user.id,
+        patientName: profile?.full_name || profileProp?.name,
+        profileProp,
+        location: loc
+      });
 
-      if (insertError) {
-        console.error("SOS Insert Error:", insertError);
-        setSosStatus('error');
-        setSosMessage("Unable to create SOS alert. Please try again.");
-      } else {
-        console.log("SOS record inserted, invoking edge function...");
-        
-        // Also insert a notification to maintain the bell icon history
-        await supabase.from('notifications').insert([{
-          patient_id: user.id,
-          patient_name: profile?.full_name || 'Patient',
-          title: "🚨 Emergency SOS Alert",
-          message: "Emergency SOS Alert",
-          type: "SOS",
-          is_read: false
-        }]);
-
-        // Invoke Edge Function
-        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('send-sos-sms', {
-          body: { alert_id: alertData.id }
+      if (result.targetPhone) {
+        setPrimaryCaretaker({
+          id: primaryCaretaker?.id,
+          name: result.targetName,
+          phone: result.targetPhone,
+          relation: result.targetRel,
+          is_primary: true
         });
+      }
 
-        if (edgeError || (edgeData && edgeData.error)) {
-           const errMsg = edgeError?.message || edgeData?.error || "Failed to send notification";
-           console.error("SMS Edge Function Error:", errMsg);
-           setSosStatus('error');
-           
-           if (typeof errMsg === "string" && (errMsg.includes("No caretaker push subscriptions found") || errMsg.includes("Caretaker has not enabled emergency notifications"))) {
-              setSosMessage("Emergency notifications are disabled on the caretaker's phone. Please call your emergency contact directly: " + (primaryCaretaker?.phone || ''));
-           } else {
-              setSosMessage("We couldn't send the emergency notification. Please call your emergency contact directly.");
-           }
-           return;
-        }
-
-        setSosStatus('success');
-        setSosMessage(loc ? "📍 Location shared with Primary Caretaker (Check Guardian app)" : "⚠️ SOS sent, but location was unavailable.");
-        setTimeout(() => {
-            setShowSosConfirm(false);
-            setSosStatus('idle');
-        }, 3000);      }
-    } catch (err) {
-      console.error("SOS catch error:", err);
+      setSosStatus('success');
+      setSosMessage(loc ? `📍 Location & SOS Alert successfully broadcasted to ${result.targetName} (${result.targetPhone})!` : `🚨 SOS Alert sent to ${result.targetName} (${result.targetPhone})!`);
+    } catch (err: any) {
+      console.error("SOS catch notice:", err);
+      const fallbackPhone = primaryCaretaker?.phone || profile?.emergency_contact_phone || profileProp?.emergency_contact_phone || "108";
+      const fallbackName = primaryCaretaker?.name || profile?.emergency_contact_name || "Emergency Contact";
       setSosStatus('error');
-      setSosMessage("Emergency notification could not be completed. Please try again.");
+      setSosMessage(`Emergency Alert Dispatch: Please call your emergency contact ${fallbackName} (${fallbackPhone}) directly.`);
     }
   };
 
@@ -308,12 +416,159 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
               <UserIcon className="w-32 h-32 text-emerald-800" />
             </div>
             <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-400 to-[#1F4E46]"></div>
+            
             <div className="relative z-10">
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl flex items-center justify-center text-emerald-700 mb-5 shadow-sm border border-emerald-200/50 transform transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
-                <UserIcon className="w-7 h-7" />
+              {/* Patient Passport Size Photo (35×45mm) Section */}
+              <div className="bg-stone-50/90 rounded-2xl p-4 border border-stone-200/80 mb-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider">
+                      {currentLang === 'hi' ? 'रोगी पासपोर्ट फोटो' : currentLang === 'bn' ? 'রোগীর পাসপোর্ট ছবি' : 'Patient Passport Photo'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    35 × 45 mm
+                  </span>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  {/* Passport Photo Frame (35:45 ratio) */}
+                  <div className="relative group/frame shrink-0">
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (e.dataTransfer.files?.[0]) handlePhotoFile(e.dataTransfer.files[0]);
+                      }}
+                      className={`w-20 h-26 sm:w-24 sm:h-30 rounded-xl overflow-hidden border-2 cursor-pointer transition-all duration-300 flex flex-col items-center justify-center relative bg-gradient-to-b from-stone-100 to-stone-200 shadow-md ${
+                        patientPhoto 
+                          ? 'border-emerald-500 hover:border-emerald-600 hover:shadow-emerald-900/20' 
+                          : 'border-dashed border-emerald-400 hover:border-emerald-600 hover:bg-emerald-50/50'
+                      }`}
+                      title={patientPhoto ? (currentLang === 'hi' ? 'पासपोर्ट फोटो बदलने के लिए क्लिक करें' : currentLang === 'bn' ? 'পাসপোর্ট ছবি পরিবর্তন করতে ক্লিক করুন' : 'Click to change passport photo') : (currentLang === 'hi' ? 'पासपोर्ट फोटो अपलोड करें (35×45mm)' : currentLang === 'bn' ? 'পাসপোর্ট ছবি আপলোড করুন (৩৫×৪৫মিমি)' : 'Click or drag to upload patient passport size photo (35×45mm)')}
+                    >
+                      {patientPhoto ? (
+                        <>
+                          <img 
+                            src={patientPhoto} 
+                            alt="Patient Passport Size" 
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Hover Overlay */}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/frame:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[11px] font-semibold gap-1 backdrop-blur-[1px]">
+                            <Camera className="w-5 h-5" />
+                            <span>{currentLang === 'hi' ? 'बदलें' : currentLang === 'bn' ? 'পরিবর্তন' : 'Change'}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="p-2 text-center flex flex-col items-center justify-center">
+                          <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-1 shadow-xs group-hover/frame:scale-110 transition-transform">
+                            <Camera className="w-4 h-4" />
+                          </div>
+                          <span className="text-[10px] font-bold text-emerald-900 leading-tight block">
+                            {currentLang === 'hi' ? 'फोटो अपलोड' : currentLang === 'bn' ? 'ছবি আপলোড' : 'Upload'}
+                          </span>
+                          <span className="text-[9px] text-emerald-700 font-semibold mt-0.5">35×45mm</span>
+                        </div>
+                      )}
+
+                      {/* Passport Alignment Corner Guides */}
+                      <div className="absolute top-1 left-1 w-1.5 h-1.5 border-t-2 border-l-2 border-emerald-500/70 pointer-events-none" />
+                      <div className="absolute top-1 right-1 w-1.5 h-1.5 border-t-2 border-r-2 border-emerald-500/70 pointer-events-none" />
+                      <div className="absolute bottom-1 left-1 w-1.5 h-1.5 border-b-2 border-l-2 border-emerald-500/70 pointer-events-none" />
+                      <div className="absolute bottom-1 right-1 w-1.5 h-1.5 border-b-2 border-r-2 border-emerald-500/70 pointer-events-none" />
+                    </div>
+
+                    {/* Hidden Native File Input */}
+                    <input 
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) handlePhotoFile(e.target.files[0]);
+                        e.target.value = '';
+                      }}
+                    />
+                  </div>
+
+                  {/* Photo Info & Action Buttons */}
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-extrabold text-[#153A34] leading-snug truncate">
+                      {profile?.full_name || profileProp?.name || 'Patient'}
+                    </h2>
+                    <p className="text-xs text-stone-500 mb-2 truncate font-mono">
+                      {profile?.patientId || profileProp?.patientId || user.email}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingPhoto}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-[#1F4E46] hover:bg-[#153A34] text-white shadow-xs transition active:scale-95 disabled:opacity-60"
+                      >
+                        {isUploadingPhoto ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {patientPhoto 
+                            ? (currentLang === 'hi' ? 'फोटो बदलें' : currentLang === 'bn' ? 'ছবি পরিবর্তন' : 'Change Photo') 
+                            : (currentLang === 'hi' ? 'पासपोर्ट फोटो अपलोड करें' : currentLang === 'bn' ? 'পাসপোর্ট ছবি আপলোড' : 'Upload Passport Photo')}
+                        </span>
+                      </button>
+
+                      {patientPhoto && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowPhotoPreviewModal(true)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-[#1F4E46] border border-stone-200 shadow-xs transition"
+                            title="View official passport photo ID card"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>{currentLang === 'hi' ? 'देखें' : currentLang === 'bn' ? 'দেখুন' : 'View'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRemovePhoto}
+                            className="p-1.5 rounded-xl hover:bg-rose-50 text-stone-400 hover:text-rose-600 transition"
+                            title="Remove passport photo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-stone-400 mt-2">
+                      {currentLang === 'hi' ? '35×45mm अनुपात • जेपीजी, पीएनजी समर्थित' : currentLang === 'bn' ? '৩৫×৪৫মিমি অনুপাত • জেপিজি, পিএনজি সমর্থিত' : 'Official 35×45mm ratio • JPG, PNG supported'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Upload Feedback Message */}
+                {photoFeedback && (
+                  <div className={`mt-3 p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 animate-in fade-in duration-200 ${
+                    photoFeedback.type === 'success' ? 'bg-emerald-100 text-emerald-900 border border-emerald-200' : 'bg-rose-100 text-rose-900 border border-rose-200'
+                  }`}>
+                    {photoFeedback.type === 'success' ? <Check className="w-4 h-4 shrink-0 text-emerald-600" /> : <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />}
+                    <span>{photoFeedback.text}</span>
+                  </div>
+                )}
               </div>
-              <h2 className="text-xl font-extrabold text-[#153A34] mb-1 tracking-tight">{currentLang === 'hi' ? 'रोगी प्रोफ़ाइल' : currentLang === 'bn' ? 'রোগীর প্রোফাইল' : 'Patient Profile'}</h2>
-              <p onClick={onOpenProfile} className="text-sm text-emerald-600/80 font-medium mb-5 cursor-pointer hover:text-emerald-700 hover:underline flex items-center gap-1">{currentLang === 'hi' ? 'अपना व्यक्तिगत स्वास्थ्य डेटा प्रबंधित करें' : currentLang === 'bn' ? 'আপনার ব্যক্তিগত স্বাস্থ্য ডেটা পরিচালনা করুন' : 'Manage your personal health data'} <span>→</span></p>
+
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-[#153A34]">{currentLang === 'hi' ? 'रोगी विवरण' : currentLang === 'bn' ? 'রোগীর বিবরণ' : 'Patient Details'}</h3>
+                <button onClick={onOpenProfile} className="text-xs text-emerald-600 font-semibold hover:text-emerald-700 hover:underline flex items-center gap-1">
+                  <span>{currentLang === 'hi' ? 'संपादित करें' : currentLang === 'bn' ? 'সম্পাদনা' : 'Edit'}</span>
+                  <span>→</span>
+                </button>
+              </div>
+
               <div className="space-y-3 mb-6 bg-stone-50/50 rounded-2xl p-4 border border-stone-100">
                 <div className="flex justify-between items-center py-2 border-b border-gray-50">
                   <span className="text-gray-500 text-sm">{currentLang === 'hi' ? 'भूमिका' : currentLang === 'bn' ? 'ভূমিকা' : 'Role'}</span>
@@ -325,7 +580,7 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
                 </div>
                 {profile?.phone && (
                   <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                    <span className="text-gray-500 text-sm">{currentLang === 'hi' ? 'फ़ोन' : currentLang === 'bn' ? 'ফোন' : 'Phone'}</span>
+                    <span className="text-gray-500 text-sm">{currentLang === 'hi' ? 'फ़ोन' : currentLang === 'bn' ? 'फोन' : 'Phone'}</span>
                     <span className="font-semibold text-[#153A34]">{profile.phone}</span>
                   </div>
                 )}
@@ -695,11 +950,33 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
 
             {sosStatus === 'success' && (
               <div className="py-6 text-center animate-in fade-in zoom-in duration-300">
-                <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                   <Check className="w-10 h-10" />
                 </div>
-                <h4 className="text-2xl font-bold text-gray-800 mb-2">Success</h4>
-                <p className="text-emerald-700 font-medium text-lg whitespace-pre-line">{sosMessage}</p>
+                <h4 className="text-2xl font-bold text-gray-800 mb-2">SOS Alert Dispatched</h4>
+                <p className="text-emerald-800 font-medium text-base whitespace-pre-line mb-6 bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+                  {sosMessage}
+                </p>
+                
+                <div className="space-y-3">
+                  <a
+                    href={`tel:${primaryCaretaker?.phone || '108'}`}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 shadow-lg shadow-emerald-200 w-full text-lg transition-transform"
+                  >
+                    <Phone className="w-5 h-5 animate-bounce" />
+                    <span>Call {primaryCaretaker?.name || 'Contact'} ({primaryCaretaker?.phone || '108'})</span>
+                  </a>
+
+                  <button 
+                    onClick={() => {
+                      setShowSosConfirm(false);
+                      setSosStatus('idle');
+                    }}
+                    className="px-6 py-3 rounded-xl font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 w-full transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             )}
 
@@ -708,16 +985,132 @@ export const PatientDashboardView: React.FC<PatientDashboardProps> = ({ user, on
                 <div className="w-20 h-20 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <AlertCircle className="w-10 h-10" />
                 </div>
-                <h4 className="text-2xl font-bold text-gray-800 mb-2">Error</h4>
-                <p className="text-rose-600 font-medium mb-6">{sosMessage}</p>
-                <button 
-                  onClick={() => setShowSosConfirm(false)}
-                  className="px-6 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 w-full"
-                >
-                  Close
-                </button>
+                <h4 className="text-2xl font-bold text-gray-800 mb-2">Emergency Contact</h4>
+                <p className="text-rose-700 font-medium mb-6 bg-rose-50 border border-rose-200 p-3 rounded-xl text-sm">{sosMessage}</p>
+                
+                <div className="space-y-3">
+                  <a
+                    href={`tel:${primaryCaretaker?.phone || '108'}`}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 shadow-lg shadow-rose-200 w-full text-lg transition-transform"
+                  >
+                    <Phone className="w-5 h-5 animate-pulse" />
+                    <span>Call {primaryCaretaker?.name || 'Emergency Contact'} ({primaryCaretaker?.phone || '108'})</span>
+                  </a>
+
+                  <a
+                    href="tel:108"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-amber-600 hover:bg-amber-700 w-full"
+                  >
+                    <span>🚑 Call Govt. Ambulance (108)</span>
+                  </a>
+
+                  <button 
+                    onClick={() => {
+                      setShowSosConfirm(false);
+                      setSosStatus('idle');
+                    }}
+                    className="px-6 py-2.5 rounded-xl font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 w-full"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Passport Photo Preview Modal */}
+      {showPhotoPreviewModal && patientPhoto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-stone-200 animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-[#1F4E46] text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-400/20 flex items-center justify-center text-emerald-300">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-wide">
+                    {currentLang === 'hi' ? 'रोगी पहचान पत्र • 35×45mm पासपोर्ट फोटो' : currentLang === 'bn' ? 'রোগী পরিচয়পত্র • ৩৫×৪৫মিমি পাসপোর্ট ছবি' : 'Patient Photo ID • 35×45mm Passport'}
+                  </h3>
+                  <p className="text-[10px] text-emerald-200/80">Apna Mitra Senior Health Companion</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPhotoPreviewModal(false)}
+                className="p-1.5 rounded-full hover:bg-white/10 text-white/80 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Photo and ID card body */}
+            <div className="p-6 bg-gradient-to-b from-stone-50 to-white">
+              <div className="flex flex-col items-center">
+                {/* Official Passport Frame */}
+                <div className="w-36 h-46 sm:w-40 sm:h-52 rounded-2xl overflow-hidden border-4 border-white shadow-xl ring-1 ring-stone-300/80 relative mb-4 bg-stone-100">
+                  <img
+                    src={patientPhoto}
+                    alt="Patient Passport"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-2 right-2 bg-emerald-600/90 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                    <Check className="w-2.5 h-2.5" />
+                    <span>35×45mm</span>
+                  </div>
+                </div>
+
+                <h4 className="text-xl font-black text-[#153A34] mb-0.5 text-center">
+                  {profile?.full_name || profileProp?.name || 'Patient'}
+                </h4>
+                <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 mb-4">
+                  {profile?.patientId || profileProp?.patientId || 'AM-UID-REGISTERED'}
+                </span>
+
+                {/* Details grid */}
+                <div className="w-full bg-stone-50 rounded-2xl p-4 border border-stone-200/70 text-xs space-y-2 mb-5">
+                  <div className="flex justify-between py-1 border-b border-stone-200/50">
+                    <span className="text-stone-500">{currentLang === 'hi' ? 'आयु / जन्म तिथि' : currentLang === 'bn' ? 'বয়স / জন্ম তারিখ' : 'Age / Date of Birth'}</span>
+                    <span className="font-semibold text-stone-800">
+                      {profile?.age || profileProp?.age || '72'} yrs • {profileProp?.dob || profile?.dob || '15/05/1954'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-stone-200/50">
+                    <span className="text-stone-500">{currentLang === 'hi' ? 'रक्त समूह' : currentLang === 'bn' ? 'রক্তের গ্রুপ' : 'Blood Group'}</span>
+                    <span className="font-bold text-rose-600">{profile?.blood_group || profileProp?.bloodGroup || '—'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-stone-200/50">
+                    <span className="text-stone-500">{currentLang === 'hi' ? 'आपातकालीन संपर्क' : currentLang === 'bn' ? 'জরুরী যোগাযোগ' : 'Emergency Contact'}</span>
+                    <span className="font-semibold text-stone-800 font-mono">
+                      {primaryCaretaker?.phone || profile?.emergency_contact_phone || '—'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 w-full">
+                  <a
+                    href={patientPhoto}
+                    download={`Patient_Passport_Photo_${profile?.full_name || 'ID'}.jpg`}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-stone-100 hover:bg-stone-200 text-stone-800 flex items-center justify-center gap-1.5 transition"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>{currentLang === 'hi' ? 'फोटो डाउनलोड' : currentLang === 'bn' ? 'ছবি ডাউনলোড' : 'Download Photo'}</span>
+                  </a>
+                  <button
+                    onClick={() => {
+                      setShowPhotoPreviewModal(false);
+                      fileInputRef.current?.click();
+                    }}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-[#1F4E46] hover:bg-[#153A34] text-white flex items-center justify-center gap-1.5 transition"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>{currentLang === 'hi' ? 'फोटो बदलें' : currentLang === 'bn' ? 'ছবি পরিবর্তন' : 'Change Photo'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

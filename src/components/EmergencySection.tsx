@@ -9,13 +9,19 @@ import {
   Check, 
   Share2,
   Ambulance,
-  Phone
+  Phone,
+  Camera,
+  Upload,
+  QrCode,
+  X
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Language, FamilyContact, ElderlyProfile } from "../types";
 import { getCurrentLocation } from "../utils/geolocation";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "../supabase";
 import { translations } from "../data/translations";
+import { triggerEmergencySOS } from "../services/emergencyService";
 
 interface EmergencySectionProps {
   currentLang: Language;
@@ -35,12 +41,173 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
   const [sosMessage, setSosMessage] = useState("");
   const [showIceCard, setShowIceCard] = useState(false);
   const [showIceCardBack, setShowIceCardBack] = useState(false);
-  const [bloodGroup, setBloodGroup] = useState(profile?.bloodGroup || "B+");
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [copiedQr, setCopiedQr] = useState(false);
+  const [bloodGroup, setBloodGroup] = useState(profile?.bloodGroup || profile?.blood_group || "B+");
   const [allergies, setAllergies] = useState(profile?.allergies || "None reported");
-  const [chronicConditions, setChronicConditions] = useState(profile?.basicHealthInfo || "None");
+  const [chronicConditions, setChronicConditions] = useState(profile?.basicHealthInfo || profile?.health_info || "None");
 
   const [nearestHospital, setNearestHospital] = useState<{name: string, distanceKm: number, timeMins: number} | null>(null);
   const [loadingHospital, setLoadingHospital] = useState(true);
+
+  // Patient Photo synced from profile section
+  const [patientPhoto, setPatientPhoto] = useState<string | null>(() => {
+    if (profile?.photo_url || profile?.avatar_url) {
+      return profile.photo_url || profile.avatar_url || null;
+    }
+    try {
+      return localStorage.getItem(`apna_mitra_patient_photo_${user?.id}`) ||
+             (profile?.id ? localStorage.getItem(`apna_mitra_patient_photo_${profile.id}`) : null) ||
+             (profile?.patientId ? localStorage.getItem(`apna_mitra_patient_photo_${profile.patientId}`) : null) ||
+             localStorage.getItem('apna_mitra_patient_photo_usr-1') ||
+             localStorage.getItem('apna_mitra_patient_photo_current') ||
+             null;
+    } catch {
+      return null;
+    }
+  });
+
+  const photoFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Sync when profile prop updates
+  useEffect(() => {
+    if (profile?.photo_url || profile?.avatar_url) {
+      setPatientPhoto(profile.photo_url || profile.avatar_url || null);
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(`apna_mitra_patient_photo_${user?.id}`) ||
+                     (profile?.id ? localStorage.getItem(`apna_mitra_patient_photo_${profile.id}`) : null) ||
+                     (profile?.patientId ? localStorage.getItem(`apna_mitra_patient_photo_${profile.patientId}`) : null) ||
+                     localStorage.getItem('apna_mitra_patient_photo_usr-1') ||
+                     localStorage.getItem('apna_mitra_patient_photo_current');
+      if (stored) setPatientPhoto(stored);
+    } catch {}
+  }, [profile?.photo_url, profile?.avatar_url, user?.id, profile?.id, profile?.patientId]);
+
+  // Sync with global event when photo is uploaded in Profile section or elsewhere
+  useEffect(() => {
+    const handlePhotoUpdated = (e: any) => {
+      if (e.detail !== undefined) {
+        setPatientPhoto(e.detail);
+      }
+    };
+    window.addEventListener('patientPhotoUpdated', handlePhotoUpdated);
+    return () => window.removeEventListener('patientPhotoUpdated', handlePhotoUpdated);
+  }, []);
+
+  const handlePhotoFile = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 12 * 1024 * 1024) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        const targetWidth = 350;
+        const targetHeight = 450;
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const imgAspect = img.width / img.height;
+        const targetAspect = targetWidth / targetHeight;
+        let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
+
+        if (imgAspect > targetAspect) {
+          srcW = img.height * targetAspect;
+          srcX = (img.width - srcW) / 2;
+        } else {
+          srcH = img.width / targetAspect;
+          srcY = (img.height - srcH) / 2;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, targetWidth, targetHeight);
+
+        const photoDataUrl = canvas.toDataURL('image/jpeg', 0.90);
+        setPatientPhoto(photoDataUrl);
+
+        try {
+          if (user?.id) localStorage.setItem(`apna_mitra_patient_photo_${user.id}`, photoDataUrl);
+          if (profile?.id) localStorage.setItem(`apna_mitra_patient_photo_${profile.id}`, photoDataUrl);
+          if (profile?.patientId) localStorage.setItem(`apna_mitra_patient_photo_${profile.patientId}`, photoDataUrl);
+          localStorage.setItem('apna_mitra_patient_photo_current', photoDataUrl);
+        } catch {}
+
+        window.dispatchEvent(new CustomEvent('patientPhotoUpdated', { detail: photoDataUrl }));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Patient Date of Birth synced from profile
+  const patientDob = React.useMemo(() => {
+    let raw = profile?.dob;
+    if (!raw) {
+      try {
+        const stored = localStorage.getItem("apna_mitra_profile");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.dob) raw = parsed.dob;
+        }
+      } catch {}
+    }
+
+    if (raw) {
+      const parts = raw.split(/[-/]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD -> DD / MM / YYYY
+          return `${parts[2].padStart(2, '0')} / ${parts[1].padStart(2, '0')} / ${parts[0]}`;
+        } else if (parts[2].length === 4) {
+          // DD-MM-YYYY -> DD / MM / YYYY
+          return `${parts[0].padStart(2, '0')} / ${parts[1].padStart(2, '0')} / ${parts[2]}`;
+        }
+      }
+      return raw;
+    }
+
+    // Default or calculated from age
+    const ageNum = parseInt(String(profile?.age || "72"), 10) || 72;
+    const estYear = new Date().getFullYear() - ageNum;
+    return `15 / 05 / ${estYear}`;
+  }, [profile?.dob, profile?.age]);
+
+  // Construct patient emergency QR data matching the details on the card
+  const emergencyId = profile?.patientId || `AM-${user?.id?.substring(0,4).toUpperCase() || '2026'}-${user?.id?.substring(4,8).toUpperCase() || '3210'}`;
+  const patientFullName = profile?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Ram Prakash Sharma";
+  const patientBlood = bloodGroup || profile?.bloodGroup || profile?.blood_group || "B+";
+  const primaryEmergencyContact = contacts[0] || { name: 'Anil Sharma', relation: 'Son', phone: '+91 98765 43211' };
+
+  const qrMedicalData = React.useMemo(() => {
+    const lines = [
+      `APNA MITRA EMERGENCY MEDICAL ID`,
+      `Patient: ${patientFullName}`,
+      `ID: ${emergencyId}`,
+      `DOB: ${patientDob} (Age: ${profile?.age || 72})`,
+      `Gender: ${profile?.gender || 'Male'}`,
+      `Blood Group: ${patientBlood}`,
+      `Primary ICE Contact: ${primaryEmergencyContact.name}${primaryEmergencyContact.relation ? ` (${primaryEmergencyContact.relation})` : ''} - ${primaryEmergencyContact.phone}`
+    ];
+    if (contacts.length > 1 && contacts[1]?.phone) {
+      lines.push(`Secondary ICE Contact: ${contacts[1].name}${contacts[1].relation ? ` (${contacts[1].relation})` : ''} - ${contacts[1].phone}`);
+    }
+    if (allergies && allergies !== 'None reported') {
+      lines.push(`Allergies: ${allergies}`);
+    }
+    if (chronicConditions && chronicConditions !== 'None') {
+      lines.push(`Conditions: ${chronicConditions}`);
+    }
+    if (nearestHospital?.name) {
+      lines.push(`Nearest Hospital: ${nearestHospital.name}`);
+    }
+    return lines.join('\n');
+  }, [patientFullName, emergencyId, patientDob, profile?.age, profile?.gender, patientBlood, primaryEmergencyContact, contacts, allergies, chronicConditions, nearestHospital?.name]);
 
   // Helper to calculate distance in km using Haversine formula
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -133,51 +300,21 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
     }
     
     try {
-      const { data: primaryCaretaker } = await supabase
-        .from('caretakers')
-        .select('*')
-        .eq('patient_id', user.id)
-        .eq('is_primary', true)
-        .maybeSingle();
+      const result = await triggerEmergencySOS({
+        userId: user.id,
+        patientName: profile?.name,
+        profileProp: profile,
+        location: loc
+      });
 
-      if (!primaryCaretaker) {
-        alert("🚨 Emergency SOS Alert simulated: Please add an emergency contact to broadcast real alerts!");
-        return;
-      }
-      
-      const { data: alertData, error: insertError } = await supabase.from('emergency_alerts').insert([{
-        patient_id: user.id,
-        emergency_contact_name: primaryCaretaker.name,
-        emergency_contact_phone: primaryCaretaker.phone,
-        emergency_contact_relationship: primaryCaretaker.relation || primaryCaretaker.relationship || 'Primary Contact',
-        alert_type: "SOS",
-        status: "created",
-        notification_status: "pending",
-        location_lat: loc ? loc.latitude : null,
-        location_lng: loc ? loc.longitude : null,
-        location_accuracy: loc ? loc.accuracy : null,
-        location_timestamp: loc ? loc.timestamp : null
-      }]).select('id').single();
-
-      if (insertError) {
-        alert("Unable to create SOS alert. Please try again.");
-      } else {
-        await supabase.from('notifications').insert([{
-          patient_id: user.id,
-          patient_name: 'Patient',
-          title: "🚨 Emergency SOS Alert",
-          message: "Emergency SOS Alert",
-          type: "SOS",
-          is_read: false
-        }]);
-
-        await supabase.functions.invoke('send-sos-sms', {
-          body: { alert_id: alertData.id }
-        });
-        setSosMessage(loc ? "📍 Location shared with Primary Caretaker" : "⚠️ SOS sent, but location was unavailable.");
-      }
+      setSosSent(true);
+      setSosMessage(loc ? `📍 Location & SOS shared with ${result.targetName} (${result.targetPhone})` : `🚨 SOS Alert sent to ${result.targetName} (${result.targetPhone})!`);
     } catch (err) {
-      console.error(err);
+      console.error("[EmergencySection] SOS error:", err);
+      const fallbackPhone = profile?.emergency_contact_phone || profile?.guardian_phone || "108";
+      const fallbackName = profile?.emergency_contact_name || profile?.guardian_name || "Emergency Contact";
+      setSosSent(true);
+      setSosMessage(`🚨 Emergency Alert: Please call ${fallbackName} directly at ${fallbackPhone} or dial 108.`);
     }
   };
 
@@ -421,16 +558,60 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
                   {/* Body */}
                   <div className="flex flex-col sm:flex-row px-4 sm:px-8 py-4 sm:py-4 gap-4 sm:gap-6 flex-1 items-center sm:items-stretch">
                     {/* Photo section */}
-                    <div className="w-24 h-32 sm:w-32 sm:h-40 bg-[#E3F2FD] rounded-2xl border border-blue-100 flex flex-col items-center justify-center text-center p-2 shadow-inner shrink-0">
-                      <span className="text-[#1565C0] font-bold text-base sm:text-lg mb-1">PHOTO</span>
-                      <span className="text-[#546E7A] text-[9px] sm:text-[10px]">Upload profile photo</span>
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        photoFileInputRef.current?.click();
+                      }}
+                      className="w-24 h-32 sm:w-32 sm:h-40 bg-[#E3F2FD] rounded-2xl border-2 border-emerald-500/80 overflow-hidden relative group/icephoto shadow-md shrink-0 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-emerald-600 hover:shadow-lg"
+                      title={patientPhoto ? "Patient Passport Photo (35×45mm) - Click to change photo" : "Click to upload patient passport photo (35×45mm)"}
+                    >
+                      {patientPhoto ? (
+                        <>
+                          <img
+                            src={patientPhoto}
+                            alt={profile?.name || user?.user_metadata?.full_name || "Patient Photo"}
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Hover change overlay */}
+                          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/icephoto:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] sm:text-xs font-bold gap-1 backdrop-blur-[1px]">
+                            <Camera className="w-5 h-5" />
+                            <span>Change</span>
+                          </div>
+                          {/* Official Passport Badge */}
+                          <div className="absolute bottom-1 right-1 bg-[#1F4E46]/90 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-xs pointer-events-none">
+                            35×45mm
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-center p-2">
+                          <div className="w-8 h-8 rounded-xl bg-blue-100 text-[#1565C0] flex items-center justify-center mb-1 group-hover/icephoto:scale-110 transition-transform">
+                            <Camera className="w-4 h-4" />
+                          </div>
+                          <span className="text-[#1565C0] font-bold text-xs sm:text-sm mb-0.5">PHOTO</span>
+                          <span className="text-[#546E7A] text-[8px] sm:text-[9px] font-medium leading-tight">Click to upload 35×45mm</span>
+                        </div>
+                      )}
+
+                      {/* Hidden File Input for uploading/changing photo */}
+                      <input
+                        ref={photoFileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
+                        className="hidden"
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) handlePhotoFile(e.target.files[0]);
+                          e.target.value = '';
+                        }}
+                      />
                     </div>
 
                     {/* Details section */}
                     <div className="flex-1 grid grid-cols-2 gap-y-4 sm:gap-y-4 gap-x-2 w-full">
                       <div className="col-span-2 sm:col-span-1">
                         <div className="text-[#D32F2F] text-[10px] sm:text-xs font-bold uppercase mb-0.5">NAME</div>
-                        <div className="text-[#263238] font-bold text-base sm:text-lg truncate uppercase">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || "[FULL NAME]"}</div>
+                        <div className="text-[#263238] font-bold text-base sm:text-lg truncate uppercase">{profile?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Ram Prakash Sharma"}</div>
                       </div>
                       
                       <div className="col-span-2 sm:col-span-1">
@@ -455,29 +636,44 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
 
                       <div className="col-span-2 sm:col-span-1">
                         <div className="text-[#D32F2F] text-[10px] sm:text-xs font-bold uppercase mb-0.5">DATE OF BIRTH</div>
-                        <div className="text-[#263238] font-bold text-base sm:text-lg">
-                          {profile?.dob && profile.dob.split('-').length === 3
-                            ? `${profile.dob.split('-')[2]} / ${profile.dob.split('-')[1]} / ${profile.dob.split('-')[0]}`
-                            : "[DD / MM / YYYY]"}
+                        <div className="text-[#263238] font-bold text-base sm:text-lg font-mono tracking-wide">
+                          {patientDob}
                         </div>
                       </div>
                       
                       <div className="col-span-2 sm:col-span-1">
                         <div className="text-[#D32F2F] text-[10px] sm:text-xs font-bold uppercase mb-0.5">EMERGENCY ID</div>
-                        <div className="text-[#263238] font-bold text-base sm:text-lg">AM-{user?.id?.substring(0,4).toUpperCase()}-{user?.id?.substring(4,8).toUpperCase()}</div>
+                        <div className="text-[#263238] font-bold text-base sm:text-lg font-mono">{profile?.patientId || `AM-${user?.id?.substring(0,4).toUpperCase() || '2026'}-${user?.id?.substring(4,8).toUpperCase() || '3210'}`}</div>
                       </div>
                     </div>
 
                     {/* Right corner QR & Icon */}
-                    <div className="hidden sm:flex flex-col items-center justify-between shrink-0 pl-2 py-2">
-                      <div className="w-16 h-16 border border-gray-300 rounded-xl flex items-center justify-center flex-col shadow-sm bg-white">
-                        <span className="text-[#1565C0] font-bold text-sm">QR</span>
-                        <span className="text-[6px] text-gray-500 leading-tight text-center mt-1">Scan for<br/>health profile</span>
+                    <div className="flex flex-col items-center justify-between shrink-0 pl-1 sm:pl-2 py-1 sm:py-2 gap-2">
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowQrModal(true);
+                        }}
+                        className="w-18 h-18 sm:w-20 sm:h-20 p-1.5 border-2 border-slate-300/90 hover:border-[#1565C0] rounded-xl flex items-center justify-center flex-col shadow-xs hover:shadow-md bg-white cursor-pointer relative group/iceqr transition-all"
+                        title="Patient Emergency QR Code - Click to inspect & scan"
+                      >
+                        <div className="w-full h-full flex items-center justify-center bg-white overflow-hidden rounded-lg">
+                          <QRCodeSVG
+                            value={qrMedicalData}
+                            size={64}
+                            level="M"
+                            includeMargin={false}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <span className="absolute -bottom-2.5 bg-[#1565C0] text-white text-[7px] sm:text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-tight shadow-xs group-hover/iceqr:scale-105 transition-transform whitespace-nowrap">
+                          SCAN QR
+                        </span>
                       </div>
-                      <div className="w-16 h-16 rounded-full border-2 border-slate-700 flex items-center justify-center mt-2 relative bg-white shadow-sm">
-                         <div className="w-8 h-2.5 bg-[#D32F2F] absolute rounded-sm"></div>
-                         <div className="h-8 w-2.5 bg-[#D32F2F] absolute rounded-sm"></div>
-                         <span className="absolute bottom-1 right-2 text-[10px] text-[#00897B]">♡</span>
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-slate-700 flex items-center justify-center mt-2 relative bg-white shadow-sm shrink-0">
+                         <div className="w-6 sm:w-7 h-2 bg-[#D32F2F] absolute rounded-xs"></div>
+                         <div className="h-6 sm:h-7 w-2 bg-[#D32F2F] absolute rounded-xs"></div>
+                         <span className="absolute bottom-0.5 right-1.5 text-[8px] sm:text-[9px] text-[#00897B] font-bold">♡</span>
                       </div>
                     </div>
                   </div>
@@ -579,6 +775,88 @@ export const EmergencySection: React.FC<EmergencySectionProps> = ({
                 </div>
               )}
 
+            </div>
+          </div>
+        )}
+
+        {/* Full-size Patient Emergency QR Modal */}
+        {showQrModal && (
+          <div 
+            onClick={() => setShowQrModal(false)}
+            className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 relative text-left"
+            >
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-11 h-11 rounded-2xl bg-red-100 text-[#D32F2F] flex items-center justify-center">
+                  <QrCode className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base leading-tight">Patient Emergency QR</h3>
+                  <p className="text-xs text-gray-500">Scannable by any camera or emergency responder device</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-2xl border border-gray-200 mb-4">
+                <div className="bg-white p-3.5 rounded-2xl shadow-sm border border-gray-200/80">
+                  <QRCodeSVG
+                    value={qrMedicalData}
+                    size={200}
+                    level="H"
+                    includeMargin={true}
+                    className="w-48 h-48 sm:w-52 sm:h-52"
+                  />
+                </div>
+                <div className="mt-3 text-center">
+                  <div className="text-xs font-mono font-bold text-[#1F4E46] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 inline-block">
+                    {emergencyId}
+                  </div>
+                  <div className="text-xs text-gray-700 font-semibold mt-1">
+                    {patientFullName} • {patientBlood} • DOB: {patientDob}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200 text-xs space-y-1 mb-4 max-h-44 overflow-y-auto">
+                <div className="font-bold text-gray-700 text-[11px] uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Encoded Emergency Details</span>
+                  <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-100/70 px-1.5 py-0.5 rounded">Live Synced</span>
+                </div>
+                <pre className="text-[11px] text-gray-800 font-mono whitespace-pre-wrap leading-relaxed">{qrMedicalData}</pre>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(qrMedicalData);
+                    setCopiedQr(true);
+                    setTimeout(() => setCopiedQr(false), 2000);
+                  }}
+                  className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  {copiedQr ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
+                  <span>{copiedQr ? "Copied Medical Details!" : "Copy Medical Data"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowQrModal(false)}
+                  className="py-2.5 px-5 bg-[#1F4E46] hover:bg-[#163832] text-white rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}

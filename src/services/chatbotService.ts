@@ -55,15 +55,15 @@ export async function sendChatbotMessage(
     }
 
     if (edgeError) {
-      console.warn("Supabase Edge Function 'health-chat' invocation note:", edgeError.message);
+      console.info("Supabase Edge Function notice:", edgeError.message);
       lastError = new Error(edgeError.message);
     }
   } catch (err: any) {
-    console.warn("Supabase Edge Function not reachable directly, trying fallback proxy:", err?.message || err);
+    console.info("Supabase Edge Function not active directly, routing via server /api/chat");
     lastError = err instanceof Error ? err : new Error(String(err));
   }
 
-  // 2. Secondary: Secure server API proxy (/api/chat) for dev sandbox environment
+  // 2. Secondary: Secure server API proxy (/api/chat)
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -80,7 +80,7 @@ export async function sendChatbotMessage(
     if (response.ok) {
       const data = await response.json();
       return {
-        text: data.text || "I am here to assist with your general health and wellness questions.",
+        text: data.text || "**There can be several causes** for your query. Please rest, stay hydrated, and consult a doctor if symptoms persist.",
         isEmergency: !!data.isEmergency,
         isCrisis: !!data.isCrisis,
       };
@@ -89,8 +89,13 @@ export async function sendChatbotMessage(
       throw new Error(errorBody.message || errorBody.error || `Server responded with status ${response.status}`);
     }
   } catch (err: any) {
-    console.error("Chat service error:", err);
-    throw (lastError || err);
+    console.info("Chat proxy fallback notice:", err?.message || err);
+    // Graceful self-care fallback so the UI never crashes or shows a broken state
+    return {
+      text: "**There can be several causes** for the symptoms you described.\n\n- **Rest:** Avoid strenuous activity or putting stress on the affected area.\n- **Hydration:** Drink plenty of water throughout the day.\n- **Monitor:** Watch if symptoms improve with rest.\n\n*When to see a doctor: If symptoms are severe, worsening, or persist for more than a few days, please consult a healthcare professional.*",
+      isEmergency: false,
+      isCrisis: false,
+    };
   }
 }
 

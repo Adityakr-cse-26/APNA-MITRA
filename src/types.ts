@@ -15,12 +15,17 @@ export interface VitalReading {
 
 export interface Medication {
   id: string;
+  patientId?: string;
   name: string;
   dosage: string;
   timing: "Morning" | "Afternoon" | "Evening" | "Night" | "Before Food" | "After Food";
   takenToday: boolean;
   instructions: string;
   scheduledTime?: string; // e.g. "08:00 AM", "01:30 PM", "08:00 PM"
+  date?: string; // YYYY-MM-DD
+  frequency?: "once" | "daily" | "weekly" | "twice_daily" | "as_needed";
+  reminderStatus?: "Scheduled" | "Sent" | "Failed" | "Taken";
+  smsEnabled?: boolean;
   remainingPills?: number;
   totalPills?: number;
   critical?: boolean; // Critical medicine that alerts caregiver if missed (e.g. BP, Insulin)
@@ -187,21 +192,32 @@ export interface CaretakerDetail {
 
 export interface ElderlyProfile {
   id?: string;
+  patientId?: string;
   role?: string;
   name: string;
   phone: string;
+  photo_url?: string;
+  avatar_url?: string;
   age: string;
   dob?: string;
   gender: string;
   bloodGroup: string;
+  blood_group?: string;
   basicHealthInfo: string;
+  health_info?: string;
   allergies?: string;
   passionsLifestyle: string;
   caretakers: CaretakerDetail[];
   isRegistered: boolean;
+  smsRemindersEnabled?: boolean;
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   emergency_contact_relationship?: string;
+  guardian_name?: string;
+  guardian_phone?: string;
+  guardian_relation?: string;
+  guardian_address?: string;
+  address?: string;
 }
 
 export interface Appointment {

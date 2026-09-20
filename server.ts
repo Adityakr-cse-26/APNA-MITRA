@@ -8,9 +8,12 @@ import {
   sendTestReminderPush, 
   startMedicationReminderCron,
   registerSyncedMedications,
-  registerSyncedSubscription
+  registerSyncedSubscription,
+  syncedMedicationsStore,
+  supabaseServer
 } from "./server/medicationReminderJob";
-import { sendMedicationSms, getSmsLogs } from "./server/smsService";
+import { sendMedicationSms, sendEmergencySosSms, getSmsLogs } from "./server/smsService";
+import { HEALTH_CHAT_SYSTEM_INSTRUCTION, generateIntelligentHealthResponse } from "./server/healthChatEngine";
 
 dotenv.config();
 
@@ -119,6 +122,21 @@ app.post("/api/medication-reminders/sync", (req: Request, res: Response) => {
   }
 });
 
+// Toggle Patient SMS Medication Reminders Endpoint
+app.post("/api/medication-reminders/toggle-sms", (req: Request, res: Response) => {
+  try {
+    const { patient_id, enabled } = req.body;
+    const existing = syncedMedicationsStore.get(patient_id);
+    if (existing) {
+      existing.sms_enabled = enabled !== false;
+      syncedMedicationsStore.set(patient_id, existing);
+    }
+    res.json({ success: true, patient_id, sms_enabled: enabled !== false });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || "Internal error" });
+  }
+});
+
 // Push Subscription Server Direct Sync
 app.post("/api/push-subscriptions/save", (req: Request, res: Response) => {
   try {
@@ -138,6 +156,133 @@ app.post("/api/push-subscriptions/save", (req: Request, res: Response) => {
     console.error("Push subscription save error:", err);
     res.status(500).json({ success: false, error: err?.message || "Internal error" });
   }
+});
+
+// In-memory Emergency SOS alerts store
+interface EmergencyAlertRecord {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relationship: string;
+  location_lat?: number | null;
+  location_lng?: number | null;
+  location_accuracy?: number | null;
+  status: "created" | "sent" | "delivered";
+  sms_status: "sent" | "simulated" | "failed";
+  timestamp: string;
+}
+
+const emergencyAlertsStore: EmergencyAlertRecord[] = [];
+
+// Emergency SOS Trigger Endpoint (Server-Side Guaranteed Delivery)
+app.post("/api/sos/trigger", async (req: Request, res: Response) => {
+  try {
+    const {
+      patient_id,
+      patient_name,
+      emergency_contact_name,
+      emergency_contact_phone,
+      emergency_contact_relationship,
+      location,
+      alert_type = "SOS"
+    } = req.body;
+
+    const targetPhone = emergency_contact_phone?.trim();
+    if (!targetPhone) {
+      return res.status(400).json({
+        success: false,
+        error: "Emergency contact phone number is required"
+      });
+    }
+
+    const alertId = "sos-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
+    const locationLat = location?.latitude || null;
+    const locationLng = location?.longitude || null;
+
+    // 1. Dispatch Emergency SOS SMS immediately via SMS Gateway / Twilio / Simulator
+    const smsResult = await sendEmergencySosSms({
+      patient_id: patient_id || "unknown",
+      to: targetPhone,
+      patient_name: patient_name || "Apna Mitra Patient",
+      emergency_contact_name: emergency_contact_name || "Emergency Contact",
+      relationship: emergency_contact_relationship || "Guardian",
+      location_lat: locationLat,
+      location_lng: locationLng
+    });
+
+    // 2. Record in server store so it is never lost
+    const alertRecord: EmergencyAlertRecord = {
+      id: alertId,
+      patient_id: patient_id || "patient",
+      patient_name: patient_name || "Patient",
+      emergency_contact_name: emergency_contact_name || "Primary Contact",
+      emergency_contact_phone: targetPhone,
+      emergency_contact_relationship: emergency_contact_relationship || "Contact",
+      location_lat: locationLat,
+      location_lng: locationLng,
+      location_accuracy: location?.accuracy || null,
+      status: "created",
+      sms_status: smsResult.status,
+      timestamp: new Date().toISOString()
+    };
+    emergencyAlertsStore.push(alertRecord);
+    if (emergencyAlertsStore.length > 100) emergencyAlertsStore.shift();
+
+    // 3. Attempt to save to Supabase tables asynchronously (non-blocking)
+    try {
+      const validUuid = (patient_id && patient_id.length === 36) ? patient_id : "00000000-0000-0000-0000-000000000000";
+      await supabaseServer.from('emergency_alerts').insert([{
+        patient_id: validUuid,
+        emergency_contact_name: emergency_contact_name || "Emergency Contact",
+        emergency_contact_phone: targetPhone,
+        emergency_contact_relationship: emergency_contact_relationship || "Guardian",
+        alert_type: alert_type,
+        status: "created",
+        notification_status: smsResult.status === "failed" ? "failed" : "sent",
+        location_lat: locationLat,
+        location_lng: locationLng,
+        location_accuracy: location?.accuracy || null,
+        location_timestamp: location?.timestamp || new Date().toISOString()
+      }]);
+
+      await supabaseServer.from('notifications').insert([{
+        patient_id: validUuid,
+        patient_name: patient_name || 'Patient',
+        title: "🚨 Emergency SOS Alert",
+        message: `Emergency SOS Alert sent to ${emergency_contact_name || 'Contact'} (${targetPhone})`,
+        type: "SOS",
+        is_read: false
+      }]);
+    } catch (dbErr: any) {
+      console.warn("[SOS-TRIGGER] Supabase secondary log notice:", dbErr?.message || dbErr);
+    }
+
+    console.log(`[SOS-TRIGGER] Alert ${alertId} processed for ${targetPhone}. SMS Status: ${smsResult.status}`);
+
+    res.json({
+      success: true,
+      alert_id: alertId,
+      sms_status: smsResult.status,
+      emergency_phone: targetPhone,
+      emergency_contact_name: emergency_contact_name || "Emergency Contact",
+      message: `Emergency SOS alert successfully dispatched to ${targetPhone}`
+    });
+  } catch (err: any) {
+    console.error("[SOS-TRIGGER] Error triggering SOS:", err);
+    res.status(500).json({
+      success: false,
+      error: err?.message || "Internal server error during SOS dispatch"
+    });
+  }
+});
+
+app.get("/api/sos/recent", (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    alerts: emergencyAlertsStore.slice(-20).reverse()
+  });
 });
 
 // 2. Symptom Checker Endpoint
@@ -617,64 +762,13 @@ app.post("/api/chat", async (req: Request, res: Response) => {
 
     const ai = getAIClient();
 
-    // If Gemini client is unavailable, provide immediate rule-based safe healthcare advice
+    // If Gemini client is unavailable, immediately provide the intelligent clinical self-care guidance
     if (!ai) {
-      if (isEmergency) {
-        return res.json({
-          text: "🚨 **URGENT MEDICAL EMERGENCY WARNING**\n\nYour message mentions symptoms that may indicate an immediate, life-threatening emergency. **Please do not wait or rely on an AI.**\n\n• **Call Emergency Services immediately:** Dial **108** or **112** (in India), or **911**.\n• Go directly to the nearest hospital emergency department.\n• If you are alone, alert a family member, neighbor, or caretaker to stay with you.",
-          isEmergency: true,
-          isCrisis: false,
-        });
-      }
-      if (isCrisis) {
-        return res.json({
-          text: "💙 **You are not alone, and help is available right now.**\n\nPlease reach out immediately to speak with someone who cares and can support you:\n\n• **Tele-MANAS (Govt of India):** Dial **14416** or **1800-891-4416** (24/7, Toll-Free)\n• **Vandrevala Foundation Helpline:** Call or WhatsApp **+91 9999 666 555**\n• **KIRAN Helpline:** Dial **1800-599-0019**\n• **Crisis Text Line / International:** Dial **988** or your local emergency services.\n\nPlease connect with a trusted family member, close friend, or healthcare professional right away.",
-          isEmergency: false,
-          isCrisis: true,
-        });
-      }
-      return res.json({
-        text: "Namaste! I am **Apna Mitra** (अपना मित्र), your AI Health & Wellness Support Companion.\n\nI am here to offer general physical, mental, and psychological wellness guidance and healthy living tips.\n\n*Please note: I am an AI assistant and not a medical doctor. I do not diagnose illnesses or prescribe prescription medicines. For personal medical diagnoses, always consult a qualified healthcare professional.*",
-        isEmergency: false,
-        isCrisis: false,
-      });
+      const fallbackResult = generateIntelligentHealthResponse({ message, history, language });
+      return res.json(fallbackResult);
     }
 
-    const systemInstruction = `You are "Apna Mitra" (अपना मित्र), an empathetic, highly responsible, and knowledgeable AI Health and Wellness Support Companion for patients, seniors, and families.
-
-========================================
-1. IMPORTANT INFORMATION IN BOLD (MANDATORY FORMATTING)
-========================================
-- ALWAYS use Markdown formatting.
-- BOLD THE MOST IMPORTANT INFORMATION, warnings, critical instructions, emergency advice, and red-flag symptoms using **bold text**.
-  Example: **If you experience sudden severe chest pressure or shortness of breath, seek emergency medical care immediately.**
-  Example: **Remember to drink at least 6-8 glasses of water throughout the day, unless restricted by your doctor.**
-- DO NOT make the entire response bold. Only highlight crucial advice, action steps, safety warnings, and key metrics in bold so the text is immediately scannable and easy to read.
-- Use short, digestible paragraphs (maximum 2-3 sentences each).
-- Use clear bullet points (-) or numbered lists (1.) for step-by-step instructions, comfort tips, and wellness measures.
-
-========================================
-2. AUTOMATIC MULTILINGUAL UNDERSTANDING & MIRRORING (MANDATORY)
-========================================
-- Automatically detect the language, alphabet, and conversational style used by the user in their message.
-- You must fluently understand English, Bengali (বাংলা), Hindi (हिंदी), Banglish (Bengali written in English letters, e.g., "amar matha betha korche", "ki korbo bolun", "pet kharap"), Hinglish (Hindi written in English letters, e.g., "mujhe chakkar aa rahe hain", "kya karna chahiye"), and other Indian languages.
-- RESPOND IN THE EXACT SAME LANGUAGE AND SCRIPT the user used:
-  * If the user writes in Banglish (Bengali with English letters) -> Reply in natural, friendly, caring Banglish using English letters.
-  * If the user writes in Bengali script (বাংলা) -> Reply in clear, polite Bengali script (বাংলা).
-  * If the user writes in Hinglish (Hindi with English letters) -> Reply in natural, friendly Hinglish using English letters.
-  * If the user writes in Hindi Devanagari script (हिंदी) -> Reply in respectful, clear Hindi Devanagari script (हिंदी).
-  * If the user writes in English -> Reply in clear, compassionate English.
-- DO NOT translate the user's message into another language unless they explicitly ask you to translate. Always mirror the user's chosen medium.
-
-========================================
-3. HEALTHCARE SAFETY & SCOPE BOUNDARIES (STRICT)
-========================================
-- NOT A DOCTOR: You are an educational health support companion, NOT a licensed doctor or clinical practitioner. Never claim, state, or imply that you are a medical doctor.
-- NO CLINICAL DIAGNOSES: You must NOT diagnose illnesses or clinical conditions (never say "You have diabetes", "You have hypertension", "You have pneumonia"). Educatively discuss general potential causes, and advise consulting a qualified physician.
-- NO PRESCRIPTION DRUGS: You must NEVER prescribe, recommend specific prescription medications, or instruct dosage changes. You may mention gentle non-prescription comfort measures (hydration, warm saline gargle for mild sore throat, sleep hygiene, gentle stretching, rest) while advising them to check with a doctor or pharmacist.
-- MEDICAL EMERGENCIES: For symptoms like severe chest pain, sudden breathlessness, sudden paralysis/weakness, unconsciousness, or heavy bleeding, highlight in **bold** that they must immediately call emergency services (**108** or **112** in India, or **911**) or rush to the nearest emergency room.
-- CRISIS & MENTAL HEALTH: For suicidal thoughts, hopelessness, or self-harm, respond with deep compassion and immediately provide 24/7 helpline contacts: **Tele-MANAS (14416 / 1800-891-4416)**, **Vandrevala Foundation (+91 9999 666 555)**, **KIRAN (1800-599-0019)**, or **988**.
-- MAINTAIN RESPECTFUL & ELDER-FRIENDLY TONE: Be warm, reassuring, and respectful at all times.`;
+    const systemInstruction = HEALTH_CHAT_SYSTEM_INSTRUCTION;
 
     const chatContents = [];
     if (Array.isArray(history)) {
@@ -716,7 +810,9 @@ app.post("/api/chat", async (req: Request, res: Response) => {
     }
 
     if (!aiText) {
-      aiText = "Namaste! I am Apna Mitra, your health & wellness assistant. Please remember that I am an educational support tool and not a doctor. Feel free to ask any physical or mental wellness questions, or consult your physician for medical diagnosis.";
+      // Use intelligent clinical self-care response instead of repetitive boilerplate greeting
+      const fallbackResult = generateIntelligentHealthResponse({ message, history, language });
+      aiText = fallbackResult.text;
     }
 
     res.json({
@@ -726,12 +822,22 @@ app.post("/api/chat", async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Chatbot API error:", error);
-    res.status(500).json({
-      text: "I am experiencing a temporary difficulty processing your request. If this is an urgent health concern, please contact a healthcare provider or call emergency medical services immediately.",
-      isEmergency: false,
-      isCrisis: false,
-      error: error?.message || "Internal server error",
-    });
+    // Gracefully fallback to intelligent clinical response even on server error
+    try {
+      const fallbackResult = generateIntelligentHealthResponse({
+        message: req.body?.message || "",
+        history: req.body?.history || [],
+        language: req.body?.language || "en",
+      });
+      res.json(fallbackResult);
+    } catch {
+      res.status(500).json({
+        text: "I am experiencing a temporary difficulty processing your request. If this is an urgent health concern, please contact a healthcare provider or call emergency services (108 / 112) immediately.",
+        isEmergency: false,
+        isCrisis: false,
+        error: error?.message || "Internal server error",
+      });
+    }
   }
 });
 

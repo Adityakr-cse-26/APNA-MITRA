@@ -313,7 +313,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess, currentLang, 
         }
       }
     } catch (err: any) {
-      console.error(err);
+      if (err?.message === "Invalid login credentials") {
+        console.info("Authentication notice: Invalid login credentials entered.");
+      } else {
+        console.error("Auth error:", err);
+      }
       
       let errorMsg = err.message || 'An error occurred during authentication.';
       if (err.message === 'Failed to fetch') errorMsg = 'Network error (Failed to fetch). This is commonly caused by an Ad Blocker (like uBlock Origin or Brave Shields) blocking authentication requests. Please disable ad blockers for this site and try again.';

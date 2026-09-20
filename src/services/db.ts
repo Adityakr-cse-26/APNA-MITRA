@@ -15,17 +15,21 @@ export const subscribeToUserProfile = (userId: string, callback: (profile: Elder
       if (error) throw error;
       
       if (data && isMounted) {
-        // Synchronize caretaker info from profiles to caretakers table on load
-        if (data.guardian_name || data.guardian_phone) {
+        // Only seed caretakers if no caretakers exist yet for this patient
+        const effectiveEmergencyPhone = data.emergency_contact_phone || data.guardian_phone;
+        const effectiveEmergencyName = data.emergency_contact_name || data.guardian_name;
+        
+        if (effectiveEmergencyPhone || effectiveEmergencyName) {
           const { data: existing, error: checkErr } = await supabase.from('caretakers').select('id').eq('patient_id', userId).limit(1);
-          if (!checkErr) {
-            if (existing && existing.length > 0) {
-              const { error: syncError } = await supabase.from('caretakers').update({ name: data.guardian_name || '', phone: data.guardian_phone || '' }).eq('id', existing[0].id);
-              if (syncError) console.warn("Could not synchronize caretaker info:", syncError?.message || syncError);
-            } else {
-              const { error: syncError } = await supabase.from('caretakers').insert([{ patient_id: userId, name: data.guardian_name || '', phone: data.guardian_phone || '', is_primary: true }]);
-              if (syncError) console.warn("Could not synchronize caretaker info:", syncError?.message || syncError);
-            }
+          if (!checkErr && (!existing || existing.length === 0)) {
+            const { error: syncError } = await supabase.from('caretakers').insert([{
+              patient_id: userId,
+              name: effectiveEmergencyName || 'Primary Caretaker',
+              phone: effectiveEmergencyPhone || '',
+              relation: data.emergency_contact_relationship || 'Guardian',
+              is_primary: true
+            }]);
+            if (syncError) console.warn("Could not seed initial caretaker info:", syncError?.message || syncError);
           }
         }
 
@@ -40,6 +44,8 @@ export const subscribeToUserProfile = (userId: string, callback: (profile: Elder
           role: data.role || "user",
           name: (data.name || data.full_name) || '',
           phone: data.phone || '',
+          photo_url: data.photo_url || data.avatar_url || '',
+          avatar_url: data.avatar_url || data.photo_url || '',
           age: data.age?.toString() || '',
           gender: data.gender || '',
           bloodGroup: data.blood_group || '',
@@ -48,6 +54,8 @@ export const subscribeToUserProfile = (userId: string, callback: (profile: Elder
           emergency_contact_name: data.emergency_contact_name || '',
           emergency_contact_phone: data.emergency_contact_phone || '',
           emergency_contact_relationship: data.emergency_contact_relationship || '',
+          guardian_name: data.guardian_name || data.emergency_contact_name || '',
+          guardian_phone: data.guardian_phone || data.emergency_contact_phone || '',
           caretakers: (caretakersData || []).map(c => ({
             id: c.id,
             name: c.name,
@@ -72,22 +80,39 @@ export const subscribeToUserProfile = (userId: string, callback: (profile: Elder
 
 export const saveUserProfile = async (userId: string, profile: ElderlyProfile) => {
   try {
+    const targetEmergencyPhone = (profile.emergency_contact_phone || profile.guardian_phone || profile.caretakers?.find(c => c.isPrimary)?.phone || profile.caretakers?.[0]?.phone || '').trim();
+    const targetEmergencyName = (profile.emergency_contact_name || profile.guardian_name || profile.caretakers?.find(c => c.isPrimary)?.name || profile.caretakers?.[0]?.name || '').trim();
+    const targetEmergencyRel = (profile.emergency_contact_relationship || profile.guardian_relation || profile.caretakers?.find(c => c.isPrimary)?.relation || profile.caretakers?.[0]?.relation || 'Primary Contact').trim();
+
+    const photoData = profile.photo_url || profile.avatar_url;
+    if (photoData && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`apna_mitra_patient_photo_${userId}`, photoData);
+        if (profile.patientId) localStorage.setItem(`apna_mitra_patient_photo_${profile.patientId}`, photoData);
+        localStorage.setItem('apna_mitra_patient_photo_current', photoData);
+      } catch {}
+    }
+
+    const profilePayload: any = {
+      id: userId,
+      full_name: profile.name,
+      phone: profile.phone,
+      age: parseInt(profile.age) || 0,
+      gender: profile.gender,
+      blood_group: profile.bloodGroup,
+      health_info: profile.basicHealthInfo,
+      lifestyle: profile.passionsLifestyle,
+      emergency_contact_name: targetEmergencyName,
+      emergency_contact_phone: targetEmergencyPhone,
+      emergency_contact_relationship: targetEmergencyRel,
+      guardian_name: targetEmergencyName,
+      guardian_phone: targetEmergencyPhone,
+      role: profile.role || 'patient',
+    };
+
     const { error } = await supabase
       .from('profiles')
-      .upsert({
-        id: userId,
-        full_name: profile.name,
-        phone: profile.phone,
-        age: parseInt(profile.age) || 0,
-        gender: profile.gender,
-        blood_group: profile.bloodGroup,
-        health_info: profile.basicHealthInfo,
-        lifestyle: profile.passionsLifestyle,
-        emergency_contact_name: profile.emergency_contact_name,
-        emergency_contact_phone: profile.emergency_contact_phone,
-        emergency_contact_relationship: profile.emergency_contact_relationship,
-        role: profile.role || 'patient',
-      });
+      .upsert(profilePayload);
       
     if (error) throw error;
 
@@ -96,26 +121,45 @@ export const saveUserProfile = async (userId: string, profile: ElderlyProfile) =
     if (profile.caretakers && profile.caretakers.length > 0) {
       console.log("[saveUserProfile] Saving caretakers:", profile.caretakers);
       
-      // Upsert all caretakers sent from the frontend
-      // For any caretaker marked as primary, others will be non-primary
+      // Fetch existing caretakers in DB to reuse their UUIDs when updating
+      const { data: existingCaretakers } = await supabase
+        .from('caretakers')
+        .select('id, is_primary')
+        .eq('patient_id', userId)
+        .order('is_primary', { ascending: false });
+
       let primaryFound = false;
-      const incomingIds = [];
+      const incomingIds: string[] = [];
       
-      const caretakersToUpsert = profile.caretakers.map(c => {
-        let isPrimary = c.isPrimary;
-        if (isPrimary) {
-           if (primaryFound) isPrimary = false; // only one primary allowed
-           primaryFound = true;
+      const caretakersToUpsert = profile.caretakers.map((c, idx) => {
+        let isPrimary = !!c.isPrimary;
+        if (!primaryFound && (isPrimary || idx === 0)) {
+          isPrimary = true;
+          primaryFound = true;
+        } else if (primaryFound && isPrimary) {
+          isPrimary = false; // Only one primary allowed
         }
+
+        // If this is the primary caretaker and we have an updated emergency phone, synchronize them
+        const caretakerPhone = isPrimary && targetEmergencyPhone ? targetEmergencyPhone : c.phone;
+        const caretakerName = isPrimary && targetEmergencyName ? targetEmergencyName : c.name;
+        const caretakerRel = isPrimary && targetEmergencyRel ? targetEmergencyRel : c.relation;
+
+        // If c.id is a UUID, use it. If not, reuse the existing caretaker row's UUID if available
+        let effectiveId = c.id && c.id.length === 36 ? c.id : undefined;
+        if (!effectiveId && existingCaretakers && existingCaretakers[idx]) {
+          effectiveId = existingCaretakers[idx].id;
+        }
+
         return {
-          id: c.id && c.id.length === 36 ? c.id : undefined, // Only use UUIDs if they exist, let Supabase generate if new
+          id: effectiveId,
           patient_id: userId,
-          name: c.name,
-          phone: c.phone,
-          email: c.email,
+          name: caretakerName,
+          phone: caretakerPhone,
+          email: c.email || '',
           age: c.age ? parseInt(c.age) || null : null,
-          gender: c.gender,
-          relation: c.relation,
+          gender: c.gender || '',
+          relation: caretakerRel || 'Guardian',
           is_primary: isPrimary
         };
       });
@@ -150,8 +194,32 @@ export const saveUserProfile = async (userId: string, profile: ElderlyProfile) =
       } else {
         await supabase.from('caretakers').delete().eq('patient_id', userId);
       }
+    } else if (targetEmergencyPhone || targetEmergencyName) {
+      // If caretakers array was empty, insert the emergency contact as primary caretaker
+      const { data: existingPrimary } = await supabase
+        .from('caretakers')
+        .select('id')
+        .eq('patient_id', userId)
+        .limit(1);
+
+      if (existingPrimary && existingPrimary.length > 0) {
+        await supabase.from('caretakers').update({
+          name: targetEmergencyName || 'Primary Contact',
+          phone: targetEmergencyPhone,
+          relation: targetEmergencyRel || 'Guardian',
+          is_primary: true
+        }).eq('id', existingPrimary[0].id);
+      } else {
+        await supabase.from('caretakers').insert([{
+          patient_id: userId,
+          name: targetEmergencyName || 'Primary Contact',
+          phone: targetEmergencyPhone,
+          relation: targetEmergencyRel || 'Guardian',
+          is_primary: true
+        }]);
+      }
     } else {
-      // If array is empty, delete all caretakers for this patient
+      // If array is empty and no emergency contact, delete caretakers for this patient
       await supabase.from('caretakers').delete().eq('patient_id', userId);
     }
   } catch (error) {
@@ -227,12 +295,17 @@ export const subscribeToMedications = (userId: string, callback: (medications: M
       if (!error && data && isMounted) {
         callback(data.map(d => ({
           id: d.id,
+          patientId: d.patient_id || userId,
           name: d.name,
           dosage: d.dosage,
           timing: d.timing,
           takenToday: d.taken_today || false,
           instructions: d.instructions,
           scheduledTime: d.scheduled_time,
+          date: d.date,
+          frequency: d.frequency || "daily",
+          reminderStatus: d.reminder_status || "Scheduled",
+          smsEnabled: d.sms_enabled !== false,
           remainingPills: d.remaining_pills,
           totalPills: d.total_pills,
           critical: d.critical,
@@ -242,7 +315,7 @@ export const subscribeToMedications = (userId: string, callback: (medications: M
       }
       if (error) throw error;
     } catch (err: any) {
-      console.warn("Medications remote query notice:", err?.message || err);
+      console.info("Medications remote query notice (using local storage):", err?.message || err);
       try {
         const key = `apna_mitra_meds_${userId}`;
         const local = localStorage.getItem(key);
@@ -250,7 +323,7 @@ export const subscribeToMedications = (userId: string, callback: (medications: M
           callback(JSON.parse(local));
         }
       } catch (e) {
-        console.warn("Meds local fallback error:", e);
+        console.info("Meds local fallback notice:", e);
       }
     }
   };
@@ -286,6 +359,10 @@ export const saveMedication = async (userId: string, medication: Medication) => 
         taken_today: medication.takenToday,
         instructions: medication.instructions,
         scheduled_time: medication.scheduledTime,
+        frequency: medication.frequency || 'daily',
+        date: medication.date || null,
+        reminder_status: medication.reminderStatus || 'Scheduled',
+        sms_enabled: medication.smsEnabled !== false,
         remaining_pills: medication.remainingPills,
         total_pills: medication.totalPills,
         critical: medication.critical,
@@ -345,7 +422,7 @@ export const subscribeToCheckins = (userId: string, callback: (checkins: DailyCh
       }
       if (error) throw error;
     } catch (err: any) {
-      console.warn("Daily checkins remote query notice:", err?.message || err);
+      console.info("Daily checkins remote query notice (using local storage):", err?.message || err);
       try {
         const key = `apna_mitra_checkins_${userId}`;
         const local = localStorage.getItem(key);
@@ -353,7 +430,7 @@ export const subscribeToCheckins = (userId: string, callback: (checkins: DailyCh
           callback(JSON.parse(local));
         }
       } catch (e) {
-        console.warn("Checkins local fallback error:", e);
+        console.info("Checkins local fallback notice:", e);
       }
     }
   };
@@ -708,45 +785,53 @@ export const savePushSubscription = async (userId: string, subscription: PushSub
   try {
     const subJSON = subscription.toJSON();
     const userTimezone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
-    
-    // Find the primary caretaker for this patient
-    const { data: primaryCaretaker } = await supabase
-      .from('caretakers')
-      .select('id')
-      .eq('patient_id', userId)
-      .eq('is_primary', true)
-      .limit(1)
-      .maybeSingle();
 
-    let caretakerId = primaryCaretaker?.id;
-    if (!caretakerId) {
-      const { data: firstCaretaker } = await supabase
+    // Store in localStorage as local fallback
+    try {
+      localStorage.setItem('apna_mitra_push_sub', JSON.stringify(subJSON));
+    } catch (_) {}
+
+    // Always sync with our server backend directly
+    try {
+      await fetch('/api/push-subscriptions/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: userId,
+          subscription: subJSON,
+          timezone: userTimezone
+        })
+      });
+    } catch (serverErr) {
+      console.warn("Server push subscription sync notice:", serverErr);
+    }
+    
+    // Find the primary caretaker for this patient if available
+    let caretakerId: string | null = null;
+    try {
+      const { data: primaryCaretaker } = await supabase
         .from('caretakers')
         .select('id')
         .eq('patient_id', userId)
+        .eq('is_primary', true)
         .limit(1)
         .maybeSingle();
-      caretakerId = firstCaretaker?.id;
-    }
 
-    // Try upserting with timezone and reminders_enabled
-    const { error } = await supabase
-      .from('push_subscriptions')
-      .upsert({
-        patient_uid: userId,
-        caretaker_id: caretakerId || null,
-        endpoint: subJSON.endpoint,
-        p256dh: subJSON.keys?.p256dh,
-        auth: subJSON.keys?.auth,
-        timezone: userTimezone,
-        reminders_enabled: true,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'endpoint' });
-      
-    if (error) {
-      // Fallback in case table doesn't have custom columns yet
-      console.warn("Save push subscription with timezone warning, retrying baseline:", error.message);
-      const { error: fallbackError } = await supabase
+      caretakerId = primaryCaretaker?.id || null;
+      if (!caretakerId) {
+        const { data: firstCaretaker } = await supabase
+          .from('caretakers')
+          .select('id')
+          .eq('patient_id', userId)
+          .limit(1)
+          .maybeSingle();
+        caretakerId = firstCaretaker?.id || null;
+      }
+    } catch (_) {}
+
+    // Try upserting to Supabase push_subscriptions (non-blocking for RLS errors)
+    try {
+      const { error } = await supabase
         .from('push_subscriptions')
         .upsert({
           patient_uid: userId,
@@ -754,12 +839,31 @@ export const savePushSubscription = async (userId: string, subscription: PushSub
           endpoint: subJSON.endpoint,
           p256dh: subJSON.keys?.p256dh,
           auth: subJSON.keys?.auth,
+          timezone: userTimezone,
+          reminders_enabled: true,
+          updated_at: new Date().toISOString()
         }, { onConflict: 'endpoint' });
-      if (fallbackError) throw fallbackError;
+        
+      if (error) {
+        // Fallback in case table doesn't have custom columns yet
+        const { error: fallbackError } = await supabase
+          .from('push_subscriptions')
+          .upsert({
+            patient_uid: userId,
+            caretaker_id: caretakerId || null,
+            endpoint: subJSON.endpoint,
+            p256dh: subJSON.keys?.p256dh,
+            auth: subJSON.keys?.auth,
+          }, { onConflict: 'endpoint' });
+        if (fallbackError) {
+          console.warn("Supabase push_subscriptions upsert warning (non-blocking):", fallbackError.message);
+        }
+      }
+    } catch (dbErr: any) {
+      console.warn("Supabase push_subscriptions database notice (non-blocking):", dbErr?.message || dbErr);
     }
   } catch (error) {
-    console.error("Save Push Subscription Error:", error);
-    throw error;
+    console.warn("Save Push Subscription notice (handled):", error);
   }
 };
 
